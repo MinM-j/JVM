@@ -33,7 +33,6 @@ impl ClassFileReader {
         Ok(self.class_file)
     }
 
-    // todo refactor read_u<n> functions
     fn read_u1(&mut self) -> Result<U1> {
         let mut buf: [U1; 1] = [0; 1];
         self.buf.read_exact(&mut buf[..])?;
@@ -77,7 +76,6 @@ impl ClassFileReader {
 
         //[1..constants_count - 1]
         //long and double takes two slot
-        //TODO handle it ^
         let mut i = 1;
         while i < constants_count {
             let constant = self.parse_constant()?;
@@ -208,8 +206,14 @@ impl ClassFileReader {
     }
 
     fn parse_constant_interface_method_ref(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::InterfaceMethodRef(ConstantInterfaceMethodRefInfo {}))
+        let class_index = self.read_u2()?;
+        let name_and_type_index = self.read_u2()?;
+        Ok(ConstantInfo::InterfaceMethodRef(
+            ConstantInterfaceMethodRefInfo {
+                class_index,
+                name_and_type_index,
+            },
+        ))
     }
 
     fn parse_constant_string(&mut self) -> Result<ConstantInfo> {
@@ -218,18 +222,22 @@ impl ClassFileReader {
     }
 
     fn parse_constant_integer(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Integer(ConstantIntegerInfo {}))
+        let bytes = self.read_u4()? as i32;
+        Ok(ConstantInfo::Integer(ConstantIntegerInfo(bytes)))
     }
 
     fn parse_constant_float(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Float(ConstantFloatInfo {}))
+        let bytes = self.read_u4()?;
+        let bytes = f32::from_bits(bytes);
+        Ok(ConstantInfo::Float(ConstantFloatInfo(bytes)))
     }
 
     fn parse_constant_long(&mut self) -> Result<ConstantInfo> {
+        //let high_bytes = self.read_u4()? as i64;
+        //let low_bytes = self.read_u4()? as i64;
+        //let bytes = high_bytes << 32 + low_bytes;
         todo!();
-        //Ok(ConstantInfo::Long(ConstantLongInfo {}))
+        //Ok(ConstantInfo::Long(ConstantLongInfo(bytes)))
     }
 
     fn parse_constant_double(&mut self) -> Result<ConstantInfo> {
@@ -248,7 +256,6 @@ impl ClassFileReader {
 
     fn parse_constant_utf8(&mut self) -> Result<ConstantInfo> {
         let length = self.read_u2()?;
-        //TODO parse modified UTF8
         let java_utf8_bytes = self.read_n_bytes(length as usize)?;
         let utf8_bytes = if let Ok(utf8_str) = cesu8::from_java_cesu8(&java_utf8_bytes) {
             utf8_str.to_string()
@@ -262,33 +269,47 @@ impl ClassFileReader {
     }
 
     fn parse_constant_method_handle(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::MethodHandle(ConstantMethodHandleInfo {}))
+        let reference_kind = self.read_u1()?;
+        let reference_index = self.read_u2()?;
+        Ok(ConstantInfo::MethodHandle(ConstantMethodHandleInfo {
+            reference_kind,
+            reference_index,
+        }))
     }
 
     fn parse_constant_method_type(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::MethodType(ConstantMethodTypeInfo {}))
+        let descriptor_index = self.read_u2()?;
+        Ok(ConstantInfo::MethodType(ConstantMethodTypeInfo {
+            descriptor_index,
+        }))
     }
 
     fn parse_constant_dynamic(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Dynamic(ConstantDynamicInfo {}))
+        let bootstrap_method_attr_index = self.read_u2()?;
+        let name_and_type_index = self.read_u2()?;
+        Ok(ConstantInfo::Dynamic(ConstantDynamicInfo {
+            bootstrap_method_attr_index,
+            name_and_type_index,
+        }))
     }
 
     fn parse_constant_invoke_dynamic(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::InvokeDynamic(ConstantInvokeDynamicInfo {}))
+        let bootstrap_method_attr_index = self.read_u2()?;
+        let name_and_type_index = self.read_u2()?;
+        Ok(ConstantInfo::InvokeDynamic(ConstantInvokeDynamicInfo {
+            bootstrap_method_attr_index,
+            name_and_type_index,
+        }))
     }
 
     fn parse_constant_module(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Module(ConstantModuleInfo {}))
+        let name_index = self.read_u2()?;
+        Ok(ConstantInfo::Module(ConstantModuleInfo { name_index }))
     }
 
     fn parse_constant_package(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Package(ConstantPackageInfo {}))
+        let name_index = self.read_u2()?;
+        Ok(ConstantInfo::Package(ConstantPackageInfo { name_index }))
     }
 
     fn parse_method_info(&mut self) -> Result<MethodInfo> {

@@ -8,7 +8,7 @@ pub enum ConstantInfo {
     Class(ConstantClassInfo),
     FieldRef(ConstantFieldRefInfo),
     Methodref(ConstantMethodRefInfo),
-    InterfaceMethodref(ConstantInterfaceMethodRefInfo),
+    InterfaceMethodRef(ConstantInterfaceMethodRefInfo),
     String(ConstantStringInfo),
     Integer(ConstantIntegerInfo),
     Float(ConstantFloatInfo),
@@ -53,28 +53,18 @@ pub struct ConstantStringInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConstantIntegerInfo {
-    pub bytes: U4,
-}
+pub struct ConstantIntegerInfo(pub i32);
 
 #[derive(Debug, Clone)]
-pub struct ConstantFloatInfo {
-    pub bytes: U4,
-}
+pub struct ConstantFloatInfo(pub f32);
 
 //MAYBE use U8? instead of two U4's
 #[derive(Debug, Clone)]
-pub struct ConstantLongInfo {
-    pub high_bytes: U4,
-    pub low_bytes: U4,
-}
+pub struct ConstantLongInfo(pub i64);
 
 //MAYBE use U8? instead of two U4's
 #[derive(Debug, Clone)]
-pub struct ConstantDoubleInfo {
-    pub high_bytes: U4,
-    pub low_bytes: U4,
-}
+pub struct ConstantDoubleInfo(pub f64);
 
 #[derive(Debug, Clone)]
 pub struct ConstantNameAndTypeInfo {

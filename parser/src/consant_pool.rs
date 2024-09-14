@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 
 // The tag field of each variant is represented by the Enum variant
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConstantInfo {
     Class(ConstantClassInfo),
     FieldRef(ConstantFieldRefInfo),
@@ -24,110 +24,104 @@ pub enum ConstantInfo {
     Package(ConstantPackageInfo),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantClassInfo {
     pub name_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantFieldRefInfo {
     pub class_index: U2,
     pub name_and_type_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantMethodRefInfo {
     pub class_index: U2,
     pub name_and_type_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantInterfaceMethodRefInfo {
     pub class_index: U2,
     pub name_and_type_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantStringInfo {
     pub string_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantIntegerInfo {
     pub bytes: U4,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantFloatInfo {
     pub bytes: U4,
 }
 
 //MAYBE use U8? instead of two U4's
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantLongInfo {
     pub high_bytes: U4,
     pub low_bytes: U4,
 }
 
 //MAYBE use U8? instead of two U4's
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantDoubleInfo {
     pub high_bytes: U4,
     pub low_bytes: U4,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantNameAndTypeInfo {
     pub name_index: U2,
     pub descriptor_index: U2,
 }
 
 // length field is removed because it is stored in Vec type
+#[derive(Debug, Clone)]
 pub struct ConstantUtf8Info {
-    pub bytes: Vec<U1>,
+    pub bytes: String,
 }
 
-impl Debug for ConstantUtf8Info {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("ConstantUtf8Info")
-            .field("bytes", &String::from_utf8_lossy(&self.bytes))
-            .finish()
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantMethodHandleInfo {
     pub reference_kind: U1,
     pub reference_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantMethodTypeInfo {
     pub descriptor_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantDynamicInfo {
     pub bootstrap_method_attr_index: U2,
     pub name_and_type_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantInvokeDynamicInfo {
     pub bootstrap_method_attr_index: U2,
     pub name_and_type_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantModuleInfo {
     pub name_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantPackageInfo {
     pub name_index: U2,
 }
 
+//Debug
 #[derive(Debug)]
 pub struct MethodInfo {
     pub access_flags: U2,

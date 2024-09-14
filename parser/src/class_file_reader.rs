@@ -77,15 +77,18 @@ impl ClassFileReader {
 
         //[1..constants_count - 1]
         //long and double takes two slot
+        //TODO handle it ^
         let mut i = 1;
         while i < constants_count {
             let constant = self.parse_constant()?;
+            constant_pool.push(constant.clone());
             match constant {
-                ConstantInfo::Long(_) => i += 2,
-                ConstantInfo::Double(_) => i += 2,
+                ConstantInfo::Long(_) | ConstantInfo::Double(_) => {
+                    i += 2;
+                    constant_pool.push(constant)
+                }
                 _ => i += 1,
             }
-            constant_pool.push(constant)
         }
         self.class_file.constant_pool = constant_pool;
         Ok(())
@@ -208,26 +211,32 @@ impl ClassFileReader {
         todo!();
         //Ok(ConstantInfo::InterfaceMethodRef(ConstantInterfaceMethodRefInfo {}))
     }
+
     fn parse_constant_string(&mut self) -> Result<ConstantInfo> {
         let string_index = self.read_u2()?;
         Ok(ConstantInfo::String(ConstantStringInfo { string_index }))
     }
+
     fn parse_constant_integer(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Integer(ConstantIntegerInfo {}))
     }
+
     fn parse_constant_float(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Float(ConstantFloatInfo {}))
     }
+
     fn parse_constant_long(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Long(ConstantLongInfo {}))
     }
+
     fn parse_constant_double(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Double(ConstantDoubleInfo {}))
     }
+
     fn parse_constant_name_and_type(&mut self) -> Result<ConstantInfo> {
         let name_index = self.read_u2()?;
         let descriptor_index = self.read_u2()?;
@@ -236,32 +245,47 @@ impl ClassFileReader {
             descriptor_index,
         }))
     }
+
     fn parse_constant_utf8(&mut self) -> Result<ConstantInfo> {
         let length = self.read_u2()?;
         //TODO parse modified UTF8
-        let bytes = self.read_n_bytes(length as usize)?;
-        Ok(ConstantInfo::Utf8(ConstantUtf8Info { bytes }))
+        let java_utf8_bytes = self.read_n_bytes(length as usize)?;
+        let utf8_bytes = if let Ok(utf8_str) = cesu8::from_java_cesu8(&java_utf8_bytes) {
+            utf8_str.to_string()
+        } else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Modified UTF8 decoding errror ",
+            ));
+        };
+        Ok(ConstantInfo::Utf8(ConstantUtf8Info { bytes: utf8_bytes }))
     }
+
     fn parse_constant_method_handle(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::MethodHandle(ConstantMethodHandleInfo {}))
     }
+
     fn parse_constant_method_type(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::MethodType(ConstantMethodTypeInfo {}))
     }
+
     fn parse_constant_dynamic(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Dynamic(ConstantDynamicInfo {}))
     }
+
     fn parse_constant_invoke_dynamic(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::InvokeDynamic(ConstantInvokeDynamicInfo {}))
     }
+
     fn parse_constant_module(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Module(ConstantModuleInfo {}))
     }
+
     fn parse_constant_package(&mut self) -> Result<ConstantInfo> {
         todo!();
         //Ok(ConstantInfo::Package(ConstantPackageInfo {}))

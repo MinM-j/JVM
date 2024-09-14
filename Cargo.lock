@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "cesu8"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c"
+
+[[package]]
 name = "cli"
 version = "0.1.0"
 dependencies = [
@@ -13,6 +19,9 @@ dependencies = [
 [[package]]
 name = "parser"
 version = "0.1.0"
+dependencies = [
+ "cesu8",
+]
 
 [[package]]
 name = "vm"

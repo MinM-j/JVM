@@ -233,16 +233,16 @@ impl ClassFileReader {
     }
 
     fn parse_constant_long(&mut self) -> Result<ConstantInfo> {
-        //let high_bytes = self.read_u4()? as i64;
-        //let low_bytes = self.read_u4()? as i64;
-        //let bytes = high_bytes << 32 + low_bytes;
-        todo!();
-        //Ok(ConstantInfo::Long(ConstantLongInfo(bytes)))
+        let raw_bytes = self.read_n_bytes(8)?;
+        let value = i64::from_be_bytes(raw_bytes.try_into().unwrap());
+
+        Ok(ConstantInfo::Long(ConstantLongInfo(value)))
     }
 
     fn parse_constant_double(&mut self) -> Result<ConstantInfo> {
-        todo!();
-        //Ok(ConstantInfo::Double(ConstantDoubleInfo {}))
+        let raw_bytes = self.read_n_bytes(8)?;
+        let value = f64::from_be_bytes(raw_bytes.try_into().unwrap());
+        Ok(ConstantInfo::Double(ConstantDoubleInfo(value)))
     }
 
     fn parse_constant_name_and_type(&mut self) -> Result<ConstantInfo> {

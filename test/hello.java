@@ -8,6 +8,7 @@ class HelloWorld {
   // Main method
   public static void main(String[] args) {
     // Print the message to the console
+    long long_val = 0x00bbccdd;
     System.out.println("Hello world");
   }
 

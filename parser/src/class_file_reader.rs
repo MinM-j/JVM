@@ -1,7 +1,8 @@
 use super::types::*;
-use super::{class_file::ClassFile, class_version::ClassVersion, consant_pool::*};
+use super::{attribute::*, class_file::ClassFile, class_version::ClassVersion, consant_pool::*};
 
 use std::io::Cursor;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Result;
 
@@ -29,7 +30,8 @@ impl ClassFileReader {
         self.parse_interfaces()?;
         self.parse_fields()?;
         self.parse_methods()?;
-        self.parse_attributes()?;
+        let attributes = self.parse_attributes()?;
+        self.class_file.attributes = attributes;
         Ok(self.class_file)
     }
 
@@ -169,15 +171,14 @@ impl ClassFileReader {
         Ok(())
     }
 
-    fn parse_attributes(&mut self) -> Result<()> {
+    fn parse_attributes(&mut self) -> Result<Vec<AttributeInfo>> {
         let attributes_count = self.read_u2()?;
         let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(attributes_count as usize);
         for _ in 0..attributes_count {
             let attribute = self.parse_attribute_info()?;
             attributes.push(attribute);
         }
-        self.class_file.attributes = attributes;
-        Ok(())
+        Ok(attributes)
     }
 
     //
@@ -222,14 +223,14 @@ impl ClassFileReader {
     }
 
     fn parse_constant_integer(&mut self) -> Result<ConstantInfo> {
-        let bytes = self.read_u4()? as i32;
-        Ok(ConstantInfo::Integer(ConstantIntegerInfo(bytes)))
+        let value = self.read_u4()? as i32;
+        Ok(ConstantInfo::Integer(ConstantIntegerInfo(value)))
     }
 
     fn parse_constant_float(&mut self) -> Result<ConstantInfo> {
         let bytes = self.read_u4()?;
-        let bytes = f32::from_bits(bytes);
-        Ok(ConstantInfo::Float(ConstantFloatInfo(bytes)))
+        let value = f32::from_bits(bytes);
+        Ok(ConstantInfo::Float(ConstantFloatInfo(value)))
     }
 
     fn parse_constant_long(&mut self) -> Result<ConstantInfo> {
@@ -265,7 +266,7 @@ impl ClassFileReader {
                 "Modified UTF8 decoding errror ",
             ));
         };
-        Ok(ConstantInfo::Utf8(ConstantUtf8Info { bytes: utf8_bytes }))
+        Ok(ConstantInfo::Utf8(ConstantUtf8Info(utf8_bytes)))
     }
 
     fn parse_constant_method_handle(&mut self) -> Result<ConstantInfo> {
@@ -318,8 +319,6 @@ impl ClassFileReader {
         let descriptor_index = self.read_u2()?;
         let attributes_count = self.read_u2()?;
 
-        dbg!(attributes_count);
-
         let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(attributes_count as usize);
 
         for _ in 0..attributes_count {
@@ -342,8 +341,6 @@ impl ClassFileReader {
         let descriptor_index = self.read_u2()?;
         let attributes_count = self.read_u2()?;
 
-        dbg!(attributes_count);
-
         let mut attributes: Vec<AttributeInfo> = Vec::with_capacity(attributes_count as usize);
 
         for _ in 0..attributes_count {
@@ -360,15 +357,159 @@ impl ClassFileReader {
         })
     }
 
+    //attribute
     fn parse_attribute_info(&mut self) -> Result<AttributeInfo> {
         let attribute_name_index = self.read_u2()?;
         let attribute_length = self.read_u4()?;
 
-        let info = self.read_n_bytes(attribute_length as usize)?;
+        let attribute_name = if let ConstantInfo::Utf8(ConstantUtf8Info(s)) = self
+            .class_file
+            .get_constant_pool_entry(attribute_name_index)
+        {
+            s
+        } else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "expected ConstantInfo::Utf8 got sth else",
+            ));
+        };
 
-        Ok(AttributeInfo {
+        dbg!(attribute_name);
+
+        match attribute_name.as_str() {
+            "ConstantValue" => self.parse_constant_value_attribute(attribute_length),
+            "Code" => self.parse_code_attribute(),
+            "LineNumberTable" => self.parse_line_number_table_attribute(),
+            "BootstrapMethods" => self.parse_bootstrap_method_attribute(),
+            //"StackMapTable" => todo!(),
+            _ => self.parse_remaining_attribute(attribute_name_index, attribute_length),
+        }
+    }
+
+    fn parse_constant_value_attribute(&mut self, attribute_length: U4) -> Result<AttributeInfo> {
+        if attribute_length == 2 {
+            let constant_value_index = self.read_u2()?;
+            //TODO directly store the constant value instead of index
+            Ok(AttributeInfo::ConstantValue(ConstantValue(
+                constant_value_index,
+            )))
+        } else {
+            Err(std::io::Error::new(
+                ErrorKind::Other,
+                "Invalid length of attribute ConstantValue",
+            ))
+        }
+    }
+
+    fn parse_remaining_attribute(
+        &mut self,
+        attribute_name_index: U2,
+        attribute_length: U4,
+    ) -> Result<AttributeInfo> {
+        let info = self.read_n_bytes(attribute_length as usize)?;
+        Ok(AttributeInfo::Attribute(RemainingAttribute {
             attribute_name_index,
             info,
-        })
+        }))
+    }
+
+    fn parse_code_attribute(&mut self) -> Result<AttributeInfo> {
+        let max_stack = self.read_u2()?;
+        let max_locals = self.read_u2()?;
+
+        let code_length = self.read_u4()?;
+        assert!(code_length > 0);
+
+        let code = self.parse_byte_code(code_length)?;
+        let exception_table_count = self.read_u2()?;
+        let exception_table = self.parse_exception_table(exception_table_count)?;
+        let attributes = self.parse_attributes()?;
+
+        Ok(AttributeInfo::Code(Code {
+            max_stack,
+            max_locals,
+            code,
+            exception_table,
+            attributes,
+        }))
+    }
+
+    fn parse_byte_code(&mut self, code_length: U4) -> Result<Vec<U1>> {
+        self.read_n_bytes(code_length as usize)
+    }
+
+    fn parse_exception_table(
+        &mut self,
+        exception_table_count: U2,
+    ) -> Result<Vec<ExceptionTableEntry>> {
+        let mut exception_table: Vec<ExceptionTableEntry> =
+            Vec::with_capacity(exception_table_count as usize);
+
+        for _ in 0..exception_table_count {
+            let start_pc = self.read_u2()?;
+            let end_pc = self.read_u2()?;
+            let handler_pc = self.read_u2()?;
+            let catch_type = self.read_u2()?;
+            let entry = ExceptionTableEntry {
+                start_pc,
+                end_pc,
+                handler_pc,
+                catch_type,
+            };
+            exception_table.push(entry);
+        }
+
+        Ok(exception_table)
+    }
+
+    fn parse_line_number_table_attribute(&mut self) -> Result<AttributeInfo> {
+        let line_number_table_count = self.read_u2()?;
+        let mut line_number_table: Vec<LineNumberTableEntry> =
+            Vec::with_capacity(line_number_table_count as usize);
+        for _ in 0..line_number_table_count {
+            let start_pc = self.read_u2()?;
+            let line_number = self.read_u2()?;
+            line_number_table.push(LineNumberTableEntry {
+                start_pc,
+                line_number,
+            })
+        }
+        Ok(AttributeInfo::LineNumberTable(LineNumberTable(
+            line_number_table,
+        )))
+    }
+
+    fn parse_bootstrap_method_attribute(&mut self) -> Result<AttributeInfo> {
+        let bootstrap_methods_count = self.read_u2()?;
+        let mut bootstrap_methods: Vec<BootstrapMethodEntry> =
+            Vec::with_capacity(bootstrap_methods_count as usize);
+
+        for _ in 0..bootstrap_methods_count {
+            let bootstrap_method_ref = self.read_u2()?;
+            let bootstrap_args_count = self.read_u2()?;
+            let mut bootstrap_args: Vec<U2> = Vec::with_capacity(bootstrap_args_count as usize);
+            for _ in 0..bootstrap_args_count {
+                let bootstrap_arg = self.read_u2()?;
+                bootstrap_args.push(bootstrap_arg);
+            }
+            let bootstrap_method = BootstrapMethodEntry {
+                bootstrap_method_ref,
+                bootstrap_args,
+            };
+            bootstrap_methods.push(bootstrap_method);
+        }
+        Ok(AttributeInfo::BootstrapMethod(BootstrapMethod(
+            bootstrap_methods,
+        )))
     }
 }
+/*
+* Seven attributes are critical to correct interpretation of the class file by the Java Virtual Machine:
+* • ConstantValue ^^
+* • Code ^^
+* • StackMapTable
+* • BootstrapMethods ^^
+* • NestHost
+* • NestMembers
+* • PermittedSubclasse
+*/

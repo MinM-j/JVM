@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use super::attribute::*;
 use super::class_version::ClassVersion;
 use super::consant_pool::*;
 use super::types::*;
@@ -16,4 +17,10 @@ pub struct ClassFile {
     pub fields: Vec<FieldInfo>,
     pub methods: Vec<MethodInfo>,
     pub attributes: Vec<AttributeInfo>,
+}
+
+impl ClassFile {
+    pub fn get_constant_pool_entry(&self, index: U2) -> &ConstantInfo {
+        &self.constant_pool[(index - 1) as usize]
+    }
 }

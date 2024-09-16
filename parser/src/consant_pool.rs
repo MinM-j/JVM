@@ -1,7 +1,52 @@
+use super::attribute::*;
 use super::types::*;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ConstantTag {
+    Class = 7,
+    Fieldref = 9,
+    Methodref = 10,
+    InterfaceMethodref = 11,
+    String = 8,
+    Integer = 3,
+    Float = 4,
+    Long = 5,
+    Double = 6,
+    NameAndType = 12,
+    Utf8 = 1,
+    MethodHandle = 15,
+    MethodType = 16,
+    Dynamic = 17,
+    InvokeDynamic = 18,
+    Module = 19,
+    Package = 20,
+}
+
+impl From<u8> for ConstantTag {
+    fn from(value: u8) -> Self {
+        match value {
+            7 => ConstantTag::Class,
+            9 => ConstantTag::Fieldref,
+            10 => ConstantTag::Methodref,
+            11 => ConstantTag::InterfaceMethodref,
+            8 => ConstantTag::String,
+            3 => ConstantTag::Integer,
+            4 => ConstantTag::Float,
+            5 => ConstantTag::Long,
+            6 => ConstantTag::Double,
+            12 => ConstantTag::NameAndType,
+            1 => ConstantTag::Utf8,
+            15 => ConstantTag::MethodHandle,
+            16 => ConstantTag::MethodType,
+            17 => ConstantTag::Dynamic,
+            18 => ConstantTag::InvokeDynamic,
+            19 => ConstantTag::Module,
+            20 => ConstantTag::Package,
+            _ => panic!("Invalid Constant Pool Tag value: {}", value),
+        }
+    }
+}
 // The tag field of each variant is represented by the Enum variant
 #[derive(Debug, Clone)]
 pub enum ConstantInfo {
@@ -74,9 +119,7 @@ pub struct ConstantNameAndTypeInfo {
 
 // length field is removed because it is stored in Vec type
 #[derive(Debug, Clone)]
-pub struct ConstantUtf8Info {
-    pub bytes: String,
-}
+pub struct ConstantUtf8Info(pub String);
 
 #[derive(Debug, Clone)]
 pub struct ConstantMethodHandleInfo {
@@ -128,64 +171,4 @@ pub struct FieldInfo {
     pub descriptor_index: U2,
     pub attributes_count: U2, // MAYBE remove it?
     pub attributes: Vec<AttributeInfo>,
-}
-pub struct AttributeInfo {
-    pub attribute_name_index: U2,
-    //attribute_length: U4, //length of info in bytes removed
-    pub info: Vec<U1>,
-}
-
-impl Debug for AttributeInfo {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("AttributeInfo")
-            .field("attribute_name_index", &self.attribute_name_index)
-            .field("info ", &String::from_utf8_lossy(&self.info))
-            .finish()
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ConstantTag {
-    Class = 7,
-    Fieldref = 9,
-    Methodref = 10,
-    InterfaceMethodref = 11,
-    String = 8,
-    Integer = 3,
-    Float = 4,
-    Long = 5,
-    Double = 6,
-    NameAndType = 12,
-    Utf8 = 1,
-    MethodHandle = 15,
-    MethodType = 16,
-    Dynamic = 17,
-    InvokeDynamic = 18,
-    Module = 19,
-    Package = 20,
-}
-
-impl From<u8> for ConstantTag {
-    fn from(value: u8) -> Self {
-        match value {
-            7 => ConstantTag::Class,
-            9 => ConstantTag::Fieldref,
-            10 => ConstantTag::Methodref,
-            11 => ConstantTag::InterfaceMethodref,
-            8 => ConstantTag::String,
-            3 => ConstantTag::Integer,
-            4 => ConstantTag::Float,
-            5 => ConstantTag::Long,
-            6 => ConstantTag::Double,
-            12 => ConstantTag::NameAndType,
-            1 => ConstantTag::Utf8,
-            15 => ConstantTag::MethodHandle,
-            16 => ConstantTag::MethodType,
-            17 => ConstantTag::Dynamic,
-            18 => ConstantTag::InvokeDynamic,
-            19 => ConstantTag::Module,
-            20 => ConstantTag::Package,
-            _ => panic!("Invalid Constant Pool Tag value: {}", value),
-        }
-    }
 }

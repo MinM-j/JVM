@@ -9,6 +9,9 @@ pub enum AttributeInfo {
     LineNumberTable(LineNumberTable),
     Code(Code),
     BootstrapMethod(BootstrapMethod),
+    NestHost(NestHost),
+    NestMembers(NestMembers),
+    PermitterSubclasses(PermitterSubclasses),
 }
 #[derive(Debug)]
 pub struct RemainingAttribute {
@@ -94,3 +97,12 @@ pub struct BootstrapMethodEntry {
     pub bootstrap_method_ref: U2,
     pub bootstrap_args: Vec<U2>,
 }
+
+#[derive(Debug)]
+pub struct NestHost(pub U2); //host_class_index
+
+#[derive(Debug)]
+pub struct NestMembers(pub Vec<U2>); //classes
+
+#[derive(Debug)]
+pub struct PermitterSubclasses(pub Vec<U2>); //classes

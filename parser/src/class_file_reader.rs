@@ -60,6 +60,16 @@ impl ClassFileReader {
         Ok(buf)
     }
 
+    fn read_u2_vec(&mut self) -> Result<Vec<U2>> {
+        let item_count = self.read_u2()?;
+        let mut items: Vec<U2> = Vec::with_capacity(item_count as usize);
+        for _ in 0..item_count {
+            let item = self.read_u2()?;
+            items.push(item);
+        }
+        Ok(items)
+    }
+
     fn parse_magic(&mut self) -> Result<()> {
         self.class_file.magic = self.read_u4()?;
         Ok(())
@@ -138,12 +148,7 @@ impl ClassFileReader {
     }
 
     fn parse_interfaces(&mut self) -> Result<()> {
-        let interfaces_count = self.read_u2()?;
-        let mut interfaces: Vec<U2> = Vec::with_capacity(interfaces_count as usize);
-        for _ in 0..interfaces_count {
-            let interface = self.read_u2()?; //parse interface
-            interfaces.push(interface);
-        }
+        let interfaces = self.read_u2_vec()?;
         self.class_file.interfaces = interfaces;
         Ok(())
     }
@@ -381,6 +386,10 @@ impl ClassFileReader {
             "Code" => self.parse_code_attribute(),
             "LineNumberTable" => self.parse_line_number_table_attribute(),
             "BootstrapMethods" => self.parse_bootstrap_method_attribute(),
+            "NestHost" => self.parse_nest_host_attribute(),
+            "NestMembers" => self.parse_nest_members_attribute(),
+            "PermittedSubclasses" => self.parse_permitted_subclasses_atttribute(),
+
             //"StackMapTable" => todo!(),
             _ => self.parse_remaining_attribute(attribute_name_index, attribute_length),
         }
@@ -486,12 +495,9 @@ impl ClassFileReader {
 
         for _ in 0..bootstrap_methods_count {
             let bootstrap_method_ref = self.read_u2()?;
-            let bootstrap_args_count = self.read_u2()?;
-            let mut bootstrap_args: Vec<U2> = Vec::with_capacity(bootstrap_args_count as usize);
-            for _ in 0..bootstrap_args_count {
-                let bootstrap_arg = self.read_u2()?;
-                bootstrap_args.push(bootstrap_arg);
-            }
+
+            let bootstrap_args = self.read_u2_vec()?;
+
             let bootstrap_method = BootstrapMethodEntry {
                 bootstrap_method_ref,
                 bootstrap_args,
@@ -502,6 +508,21 @@ impl ClassFileReader {
             bootstrap_methods,
         )))
     }
+    fn parse_nest_host_attribute(&mut self) -> Result<AttributeInfo> {
+        let host_class_index = self.read_u2()?;
+        Ok(AttributeInfo::NestHost(NestHost(host_class_index)))
+    }
+    fn parse_nest_members_attribute(&mut self) -> Result<AttributeInfo> {
+        let classes = self.read_u2_vec()?;
+        Ok(AttributeInfo::NestMembers(NestMembers(classes)))
+    }
+
+    fn parse_permitted_subclasses_atttribute(&mut self) -> Result<AttributeInfo> {
+        let classes = self.read_u2_vec()?;
+        Ok(AttributeInfo::PermitterSubclasses(PermitterSubclasses(
+            classes,
+        )))
+    }
 }
 /*
 * Seven attributes are critical to correct interpretation of the class file by the Java Virtual Machine:
@@ -509,7 +530,7 @@ impl ClassFileReader {
 * • Code ^^
 * • StackMapTable
 * • BootstrapMethods ^^
-* • NestHost
-* • NestMembers
-* • PermittedSubclasse
+* • NestHost ^^
+* • NestMembers ^^
+* • PermittedSubclasses ^^
 */

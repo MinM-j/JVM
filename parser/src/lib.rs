@@ -1,3 +1,4 @@
+pub mod access_flag;
 pub mod attribute;
 pub mod class_file;
 pub mod class_file_reader;

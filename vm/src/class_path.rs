@@ -23,6 +23,10 @@ impl ClassPath {
     fn try_parse(path: &str) -> Result<Box<dyn ClassEntry>, ClassPathError> {
         Self::try_parse_directory(path).or_else(|_| Self::try_parse_jar(path))
     }
-    fn try_parse_directory(path: &str) -> Result<Box<dyn ClassEntry>, ClassPathError> {}
-    fn try_parse_jar(path: &str) -> Result<Box<dyn ClassEntry>, ClassPathError> {}
+    fn try_parse_directory(path: &str) -> Result<Box<dyn ClassEntry>, ClassPathError> {
+        todo!()
+    }
+    fn try_parse_jar(path: &str) -> Result<Box<dyn ClassEntry>, ClassPathError> {
+        todo!()
+    }
 }

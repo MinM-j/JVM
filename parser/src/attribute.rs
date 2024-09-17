@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use super::instruction::Instruction;
 use super::types::*;
 //use std::fmt;
 
@@ -59,7 +60,7 @@ pub struct Code {
     //pub attribute_length: U4,
     pub max_stack: U2,
     pub max_locals: U2,
-    pub code: Vec<U1>,                             //code_length
+    pub code: Vec<Instruction>,                    //code_length
     pub exception_table: Vec<ExceptionTableEntry>, //exception_table_count
     pub attributes: Vec<AttributeInfo>,            //attributes_count
 }

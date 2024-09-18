@@ -199,7 +199,7 @@ impl ClassFileReader {
     //
     fn parse_constant_class(&mut self) -> Result<ConstantInfo> {
         let name_index = self.read_u2()?;
-        Ok(ConstantInfo::Class(ConstantClassInfo { name_index }))
+        Ok(ConstantInfo::Class(ConstantClassInfo(name_index)))
     }
 
     fn parse_constant_method_ref(&mut self) -> Result<ConstantInfo> {
@@ -377,7 +377,7 @@ impl ClassFileReader {
         let attribute_name_index = self.read_u2()?;
         let attribute_length = self.read_u4()?;
 
-        let attribute_name = if let ConstantInfo::Utf8(ConstantUtf8Info(s)) = self
+        let attribute_name = if let Some(ConstantInfo::Utf8(ConstantUtf8Info(s))) = self
             .class_file
             .get_constant_pool_entry(attribute_name_index)
         {
@@ -388,8 +388,6 @@ impl ClassFileReader {
                 "expected ConstantInfo::Utf8 got sth else",
             ));
         };
-
-        dbg!(attribute_name);
 
         match attribute_name.as_str() {
             "ConstantValue" => self.parse_constant_value_attribute(attribute_length),

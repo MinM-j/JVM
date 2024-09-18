@@ -1,6 +1,6 @@
 use parser::{
     access_flag::AccessFlags, consant_pool::ConstantInfo, consant_pool::FieldInfo,
-    consant_pool::MethodInfo,
+    consant_pool::MethodInfo, types::*,
 };
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -22,13 +22,14 @@ pub struct Class<'a> {
     pub id: ClassId,
     pub name: String,
     pub constants: Vec<ConstantInfo>,
-    pub flags: AccessFlags,
+    //pub flags: AccessFlags,
+    pub flags: U2, //TODO use AccessFlags
     pub superclass: Option<ClassRef<'a>>,
-    pub interface: Vec<ClassRef<'a>>,
+    pub interfaces: Vec<ClassRef<'a>>,
     pub fields: Vec<FieldInfo>,
     pub methods: Vec<MethodInfo>,
     pub first_field_index: usize,
-    pub total_fields: usize
+    pub total_fields: usize,
 }
 
 pub type ClassRef<'a> = &'a Class<'a>;

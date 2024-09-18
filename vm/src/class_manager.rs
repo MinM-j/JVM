@@ -4,7 +4,7 @@ use super::class_path::{ClassPath, ClassPathError};
 use super::error::Error;
 use indexmap::IndexMap;
 use parser::{class_file::ClassFile, class_file_reader::ClassFileReader};
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 use typed_arena::Arena;
 
 pub struct ClassManager<'a> {
@@ -69,7 +69,7 @@ impl<'a> ClassManager<'a> {
         self.class_by_name.get(name).cloned()
     }
 
-    pub fn get_resolve_class(&mut self, name: &str) -> Result<Resolved<'a>, Error> {
+    pub fn get_or_resolve_class(&mut self, name: &str) -> Result<Resolved<'a>, Error> {
         if let Some(loaded_class) = self.find_class_by_name(name) {
             Ok(Resolved::Loaded(loaded_class))
         } else {
@@ -83,12 +83,12 @@ impl<'a> ClassManager<'a> {
             .resolve(name)
             .map_err(|err| Error::ClassLoadingError(err.to_string()))?
             .ok_or(Error::ClassNotFound(name.to_string()))?;
-        let class_file = ClassFileReader::new(class_file_byte).parse();
+        let class_file = ClassFileReader::new(class_file_byte).parse()?;
         self.load_class(class_file)
     }
 
     fn load_class(&mut self, class_file: ClassFile) -> Result<ClassToInitialize<'a>, Error> {
-        let reference_class = load_super_interface(&class_file)?;
+        let reference_class = self.load_super_interface(&class_file)?;
         let loaded_class = self.allocate(class_file, reference_class)?;
         self.register(loaded_class.resolved_class);
         Ok(loaded_class)
@@ -100,12 +100,18 @@ impl<'a> ClassManager<'a> {
     ) -> Result<IndexMap<String, Resolved<'a>>, Error> {
         let mut resolved_classes: IndexMap<String, Resolved<'a>> = Default::default();
         //Todo traverse to constant info and retirieve the name of super class
-        if let Some(superclass_name) = &class_file.super_class.to_string() {
+        if let Some(superclass_name) = class_file.get_super_class_name() {
             self.resolve_collect(superclass_name, &mut resolved_classes)?;
         }
         //Todo traverse to constant info and retrieve the name of interfaces
-        for interface in class_file.interfaces.iter {
-            self.resolve_collect(interface, &mut resolved_classes)?;
+        for interface in class_file.interfaces.iter() {
+            self.resolve_collect(
+                class_file
+                    .get_underlying_string_from_constant_class_info_index(*interface)
+                    .unwrap()
+                    .as_str(),
+                &mut resolved_classes,
+            )?;
         }
         Ok(resolved_classes)
     }
@@ -115,7 +121,7 @@ impl<'a> ClassManager<'a> {
         name: &str,
         resolved_classes: &mut IndexMap<String, Resolved<'a>>,
     ) -> Result<(), Error> {
-        let class = self.get_resolve_class(name)?;
+        let class = self.get_or_resolve_class(name)?;
         resolved_classes.insert(name.to_string(), class);
         Ok(())
     }
@@ -130,6 +136,12 @@ impl<'a> ClassManager<'a> {
         let id = ClassId::new(next_id);
         let class = Self::new_class(class_file, id, &resolved_classes)?;
         let class_ref = self.arena.alloc(class);
+        // Copied fro mrjvm
+        let class_ref = unsafe {
+            let class_ptr: *const Class<'a> = class_ref;
+            &*class_ptr
+        };
+
         let mut class_init: Vec<ClassRef<'a>> = Vec::new();
         for resolved in resolved_classes.values() {
             if let Resolved::New(new_class) = resolved {
@@ -146,35 +158,39 @@ impl<'a> ClassManager<'a> {
     }
 
     fn new_class(
-        &mut self,
         class_file: ClassFile,
         id: ClassId,
         resolved_classes: &IndexMap<String, Resolved<'a>>,
     ) -> Result<Class<'a>, Error> {
         //Todo superclass should be string
         let superclass = class_file
-            .super_class
-            .as_ref()
-            .map(|name| resolved_classes.get(name).unwrap.get_class());
+            .get_super_class_name()
+            .map(|name| resolved_classes.get(name).unwrap().get_class());
+
         //Todo interfaces should be string
         let interfaces: Vec<ClassRef<'a>> = class_file
             .interfaces
             .iter()
-            .map(|name| resolved_classes.get(name).unwrap.get_class())
+            .map(|index| {
+                class_file
+                    .get_underlying_string_from_constant_class_info_index(*index)
+                    .unwrap()
+            })
+            .map(|name| resolved_classes.get(name).unwrap().get_class())
             .collect();
         let super_fields_count = match superclass {
-            Some (superclass) => superclass.num_total_fields,
-            None => 0
+            Some(superclass) => superclass.total_fields,
+            None => 0,
         };
         let fields_count = class_file.fields.len();
-        Ok(Class{
+        Ok(Class {
             id,
             //Todo this_class should be parsed too
-            name: class_file.this_class,
+            name: class_file.get_class_name().clone(),
             constants: class_file.constant_pool,
             flags: class_file.access_flags,
-            superclass
-            interfaces
+            superclass,
+            interfaces,
             fields: class_file.fields,
             methods: class_file.methods,
             first_field_index: super_fields_count,
@@ -182,9 +198,9 @@ impl<'a> ClassManager<'a> {
         })
     }
 
-    fn register(&mut self, class: ClassRef<'a>){
+    fn register(&mut self, class: ClassRef<'a>) {
         self.class_by_name.insert(class.name.clone(), class);
-        self.class_by_id.insert(class.id, class);
+        self.class_by_id.insert(class.id.clone(), class);
         self.class_loader.register(class);
     }
 }

@@ -1,8 +1,29 @@
 use super::class_entry::{ClassEntry, ClassLoadingError};
 use super::{directory_entry::DirectoryEntry, jar_entry::JarEntry};
-#[derive(Default, Debug)]
+use std::path::PathBuf;
+#[derive(Debug)]
 pub struct ClassPath {
     entries: Vec<Box<dyn ClassEntry>>,
+}
+
+impl Default for ClassPath {
+    fn default() -> Self {
+        let path = std::env::current_dir().unwrap();
+        let entry1: Box<dyn ClassEntry> = Box::new(DirectoryEntry::new(path).unwrap());
+
+        //This is the path in mayhem's device. Feel free to comment it out and change accordingly.
+        //let mut jar_path = PathBuf::new();
+        //jar_path.push("/usr/lib/jvm/java-22-openjdk/lib/jrt-fs.jar");
+        //jar_path.push("/usr/lib/jvm/java-22-openjdk/lib/modules");
+        //let entry2: Box<dyn ClassEntry> = Box::new(JarEntry::new(jar_path).unwrap());
+
+        let mut home_dir = std::env::home_dir().unwrap();
+        home_dir.push("./my_jar_dir/java.base/");
+        //let path = PathBuf::from("~/my_jar_dir/java.base/");
+        let entry2: Box<dyn ClassEntry> = Box::new(DirectoryEntry::new(home_dir).unwrap());
+        let entries = vec![entry1, entry2];
+        Self { entries }
+    }
 }
 
 #[derive(Debug)]

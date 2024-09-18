@@ -70,9 +70,7 @@ pub enum ConstantInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConstantClassInfo {
-    pub name_index: U2,
-}
+pub struct ConstantClassInfo(pub U2); //name_index
 
 #[derive(Debug, Clone)]
 pub struct ConstantFieldRefInfo {

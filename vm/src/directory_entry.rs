@@ -31,9 +31,10 @@ impl ClassEntry for DirectoryEntry {
         path.push(class_name);
         path.set_extension("class");
         if path.exists() {
-            std::fs::read(path).map(Some).map_err(ClassLoadingError::new)
-        }
-        else {
+            std::fs::read(path)
+                .map(Some)
+                .map_err(ClassLoadingError::new)
+        } else {
             Ok(None)
         }
     }

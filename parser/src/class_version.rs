@@ -1,5 +1,6 @@
 use super::types::*;
 
+#[allow(unused)]
 #[derive(Default, Debug)]
 pub struct ClassVersion {
     minor: U2,

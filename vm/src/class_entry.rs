@@ -8,3 +8,24 @@ pub struct ClassLoadingError {
     message: String,
     source: Box<dyn Error>,
 }
+
+impl ClassLoadingError {
+    pub fn new(error: impl Error + 'static) -> Self {
+        Self {
+            message: error.to_string(),
+            source: Box::new(error),
+        }
+    }
+}
+
+impl fmt::Display for ClassLoadingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for ClassLoadingError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}

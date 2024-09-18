@@ -1,7 +1,7 @@
 use super::class::ClassRef;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct ClassLoader<'a> {
     classes: HashMap<String, ClassRef<'a>>,
 }

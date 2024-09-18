@@ -3,7 +3,7 @@ use parser::{
     consant_pool::MethodInfo,
 };
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ClassId {
     id: u32,
 }

@@ -69,7 +69,7 @@ pub struct Code {
 }
 
 impl Code {
-    pub fn get_operation_at(&self, address: U4) -> Operation {
+    pub fn get_operation_at_address(&self, address: U4) -> Operation {
         //TODO this is highly inefficient since in every iteration we need to linearly search
         //This is just temporary solution for mid defense
         self.code
@@ -82,6 +82,11 @@ impl Code {
                 }
             })
             .unwrap()
+    }
+
+    pub fn get_operation_at_index(&self, index: usize) -> Operation {
+        let Instruction(_, operation) = self.code.get(index).unwrap();
+        operation.clone()
     }
 }
 

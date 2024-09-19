@@ -63,6 +63,9 @@ pub struct StackFrame<'a> {
     operand: Vec<Value>,
     cp: &'a ConstantPool,
     code: &'a Code,
+    // pc stores vector index not byte address so it is easier to get next opcode
+    // but linear search is performed in case of jump
+    // in which case we need to find vector index from byte adress
     pc: U4,
 }
 
@@ -84,14 +87,24 @@ impl<'a> StackFrame<'a> {
 
     fn execute(&mut self) {
         println!("executing frame");
+
+        //print all operation
+        //this is howy you get opcode at certain address
+        // note: 29 is valid address only for current main method
+        //       let t = self.code.get_operation_at_address(29);
+        //        println!(" 29 {t:?}");
+
         loop {
-            let operation = self.code.get_operation_at(self.pc);
+            let operation = self.code.get_operation_at_index(self.pc as usize);
             println!("{operation:?}");
+            //execution
             match operation {
-                parser::instruction::Operation::D2f => (),
                 _ => (),
             }
-            break;
+            self.pc += 1; //increase pc (vector index)
+            if self.pc as usize >= self.code.code.len() {
+                break;
+            }
         }
     }
 }

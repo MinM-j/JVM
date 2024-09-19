@@ -1,6 +1,10 @@
 // https://en.wikipedia.org/wiki/ListofJavabytecode_instructions
+use super::types::*;
 #[derive(Debug)]
-pub enum Instruction {
+pub struct Instruction(pub U4, pub Operation); //U2 = address
+
+#[derive(Debug, Clone)]
+pub enum Operation {
     Aaload,
     Aastore,
     Aconstnull,
@@ -106,7 +110,7 @@ pub enum Instruction {
     Iconst4,
     Iconst5,
     Idiv,
-    Ifacmpeq(u8, u8),
+    Ifacmpeq(u8, u8), //u16
     Ifacmpne(u8, u8),
     Ificmpeq(u8, u8),
     Ificmpge(u8, u8),

@@ -1,7 +1,8 @@
 use std::fs;
 
 use parser::class_file_reader::ClassFileReader;
-use vm::class_manager::ClassManager;
+use vm::vm::Value;
+use vm::vm::VM;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
@@ -18,8 +19,11 @@ fn main() {
 }
 
 fn run(main_class: &str) {
-    let mut class_manager = ClassManager::default();
-    let class = class_manager.get_or_resolve_class(main_class).unwrap();
+    let mut vm = VM::new();
+    // TODO provide args as string array
+    let start_args = vec![Value::Int(0)];
+    vm.start(main_class, start_args);
+    //let class = class_manager.get_or_resolve_class(main_class).unwrap();
     println!("run {main_class}");
     //dbg!(class);
 }

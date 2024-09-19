@@ -107,6 +107,7 @@ impl<'a> ClassManager<'a> {
         for interface in class_file.interfaces.iter() {
             self.resolve_collect(
                 class_file
+                    .constant_pool
                     .get_underlying_string_from_constant_class_info_index(*interface)
                     .unwrap()
                     .as_str(),
@@ -173,6 +174,7 @@ impl<'a> ClassManager<'a> {
             .iter()
             .map(|index| {
                 class_file
+                    .constant_pool
                     .get_underlying_string_from_constant_class_info_index(*index)
                     .unwrap()
             })

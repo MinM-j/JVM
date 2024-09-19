@@ -6,3 +6,4 @@ pub mod class_path;
 pub mod directory_entry;
 pub mod error;
 pub mod jar_entry;
+pub mod vm;

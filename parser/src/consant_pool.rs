@@ -1,3 +1,4 @@
+use super::access_flag::MethodFlags;
 use super::attribute::*;
 use super::types::*;
 use std::fmt::Debug;
@@ -162,11 +163,85 @@ pub struct MethodInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
+impl<'a> MethodInfo {
+    pub fn get_name(&self, cp: &'a ConstantPool) -> &'a str {
+        cp.get_underlying_string_from_utf8_index(self.name_index)
+            .unwrap()
+            .as_str()
+    }
+
+    pub fn is_main(&self, cp: &ConstantPool) -> bool {
+        let access_flag =
+            MethodFlags::from_bits(self.access_flags).expect("Error while creating MethodFlags");
+
+        if self.get_name(&cp) == "main"
+            && access_flag.contains(MethodFlags::ACC_PUBLIC | MethodFlags::ACC_STATIC)
+            && cp
+                .get_underlying_string_from_utf8_index(self.descriptor_index)
+                .unwrap()
+                .chars()
+                .last()
+                .unwrap()
+                == 'V'
+        {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_code_attribute(&self) -> Option<&Code> {
+        self.attributes.iter().find_map(|attr| match attr {
+            AttributeInfo::Code(code) => Some(code),
+            _ => None,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct FieldInfo {
+    //TODO change to MethodFlags
     pub access_flags: U2,
     pub name_index: U2,
     pub descriptor_index: U2,
     pub attributes_count: U2, // MAYBE remove it?
     pub attributes: Vec<AttributeInfo>,
+}
+
+#[derive(Debug, Default)]
+pub struct ConstantPool(Vec<ConstantInfo>);
+
+impl ConstantPool {
+    pub fn get_entry(&self, index: U2) -> Option<&ConstantInfo> {
+        if index == 0 {
+            return None;
+        } else {
+            self.0.get((index - 1) as usize)
+        }
+    }
+
+    pub fn get_underlying_string_from_utf8_index(&self, index: U2) -> Option<&String> {
+        self.get_entry(index).and_then(|cp_entry| match cp_entry {
+            ConstantInfo::Utf8(ConstantUtf8Info(ref class_name)) => Some(class_name),
+            _ => None,
+        })
+    }
+
+    pub fn get_underlying_string_from_constant_class_info_index(
+        &self,
+        index: U2,
+    ) -> Option<&String> {
+        self.get_entry(index).and_then(|cp_entry| match cp_entry {
+            &ConstantInfo::Class(ConstantClassInfo(utf8_index)) => {
+                self.get_underlying_string_from_utf8_index(utf8_index)
+            }
+            _ => None,
+        })
+    }
+}
+
+impl From<Vec<ConstantInfo>> for ConstantPool {
+    fn from(value: Vec<ConstantInfo>) -> Self {
+        Self(value)
+    }
 }

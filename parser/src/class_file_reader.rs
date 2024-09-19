@@ -1,7 +1,10 @@
 use super::types::*;
 use super::{
-    attribute::*, class_file::ClassFile, class_version::ClassVersion, consant_pool::*,
-    instruction::Instruction,
+    attribute::*,
+    class_file::ClassFile,
+    class_version::ClassVersion,
+    consant_pool::*,
+    instruction::{Instruction, Operation},
 };
 
 use std::io::Cursor;
@@ -42,6 +45,11 @@ impl ClassFileReader {
     fn read_u1_with_count(&mut self, count: &mut U4) -> Result<U1> {
         *count += 1;
         self.read_u1()
+    }
+
+    fn read_u2_with_count(&mut self, count: &mut U4) -> Result<U2> {
+        *count += 2;
+        self.read_u2()
     }
 
     fn read_u1(&mut self) -> Result<U1> {
@@ -94,6 +102,7 @@ impl ClassFileReader {
 
     fn parse_constant_pool(&mut self) -> Result<()> {
         let constants_count = self.read_u2()?;
+        // TODO define and use interfaces from ConstantPool
         let mut constant_pool: Vec<ConstantInfo> = Vec::with_capacity(constants_count as usize);
 
         //[1..constants_count - 1]
@@ -110,7 +119,7 @@ impl ClassFileReader {
                 _ => i += 1,
             }
         }
-        self.class_file.constant_pool = constant_pool;
+        self.class_file.constant_pool = constant_pool.into();
         Ok(())
     }
 
@@ -453,15 +462,15 @@ impl ClassFileReader {
 
     fn parse_byte_code(&mut self, code_length: U4) -> Result<Vec<Instruction>> {
         //self.read_n_bytes(code_length as usize);
-        let mut byte_read: U4 = 0;
+        let mut address: U4 = 0;
         let mut instructions: Vec<Instruction> = Vec::with_capacity(code_length as usize);
         loop {
             let (instr_bytes, instruction) = self.parse_instruction()?;
-            byte_read += instr_bytes;
-            instructions.push(instruction);
-            if byte_read == code_length {
+            instructions.push(Instruction(address, instruction));
+            address += instr_bytes;
+            if address == code_length {
                 break;
-            } else if byte_read > code_length {
+            } else if address > code_length {
                 return Err(std::io::Error::new(
                     ErrorKind::Other,
                     format!("Invalid position reach while parsing byte code"),
@@ -548,361 +557,361 @@ impl ClassFileReader {
         )))
     }
 
-    fn parse_instruction(&mut self) -> Result<(U4, Instruction)> {
+    fn parse_instruction(&mut self) -> Result<(U4, Operation)> {
         const LOOKUP_SWITCH_OPERAND_COUNT: usize = 8;
         const TABLE_SWITCH_OPERAND_COUNT: usize = 16;
 
         let mut byte_read: U4 = 1;
 
         let instruction = match self.read_u1()? {
-            0x32 => Instruction::Aaload,
-            0x53 => Instruction::Aastore,
-            0x01 => Instruction::Aconstnull,
-            0x19 => Instruction::Aload(self.read_u1_with_count(&mut byte_read)?),
-            0x2a => Instruction::Aload0,
-            0x2b => Instruction::Aload1,
-            0x2c => Instruction::Aload2,
-            0x2d => Instruction::Aload3,
-            0xbd => Instruction::Anewarray(
+            0x32 => Operation::Aaload,
+            0x53 => Operation::Aastore,
+            0x01 => Operation::Aconstnull,
+            0x19 => Operation::Aload(self.read_u1_with_count(&mut byte_read)?),
+            0x2a => Operation::Aload0,
+            0x2b => Operation::Aload1,
+            0x2c => Operation::Aload2,
+            0x2d => Operation::Aload3,
+            0xbd => Operation::Anewarray(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xb0 => Instruction::Areturn,
-            0xbe => Instruction::Arraylength,
-            0x3a => Instruction::Astore(self.read_u1_with_count(&mut byte_read)?),
-            0x4b => Instruction::Astore0,
-            0x4c => Instruction::Astore1,
-            0x4d => Instruction::Astore2,
-            0x4e => Instruction::Astore3,
-            0xbf => Instruction::Athrow,
-            0x33 => Instruction::Baload,
-            0x54 => Instruction::Bastore,
-            0x10 => Instruction::Bipush(self.read_u1_with_count(&mut byte_read)?),
-            0xca => Instruction::Breakpoint,
-            0x34 => Instruction::Caload,
-            0x55 => Instruction::Castore,
-            0xc0 => Instruction::Checkcast(
+            0xb0 => Operation::Areturn,
+            0xbe => Operation::Arraylength,
+            0x3a => Operation::Astore(self.read_u1_with_count(&mut byte_read)?),
+            0x4b => Operation::Astore0,
+            0x4c => Operation::Astore1,
+            0x4d => Operation::Astore2,
+            0x4e => Operation::Astore3,
+            0xbf => Operation::Athrow,
+            0x33 => Operation::Baload,
+            0x54 => Operation::Bastore,
+            0x10 => Operation::Bipush(self.read_u1_with_count(&mut byte_read)?),
+            0xca => Operation::Breakpoint,
+            0x34 => Operation::Caload,
+            0x55 => Operation::Castore,
+            0xc0 => Operation::Checkcast(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x90 => Instruction::D2f,
-            0x8e => Instruction::D2i,
-            0x8f => Instruction::D2l,
-            0x63 => Instruction::Dadd,
-            0x31 => Instruction::Daload,
-            0x52 => Instruction::Dastore,
-            0x98 => Instruction::Dcmpg,
-            0x97 => Instruction::Dcmpl,
-            0x0e => Instruction::Dconst0,
-            0x0f => Instruction::Dconst1,
-            0x6f => Instruction::Ddiv,
-            0x18 => Instruction::Dload(self.read_u1_with_count(&mut byte_read)?),
-            0x26 => Instruction::Dload0,
-            0x27 => Instruction::Dload1,
-            0x28 => Instruction::Dload2,
-            0x29 => Instruction::Dload3,
-            0x6b => Instruction::Dmul,
-            0x77 => Instruction::Dneg,
-            0x73 => Instruction::Drem,
-            0xaf => Instruction::Dreturn,
-            0x39 => Instruction::Dstore(self.read_u1_with_count(&mut byte_read)?),
-            0x47 => Instruction::Dstore0,
-            0x48 => Instruction::Dstore1,
-            0x49 => Instruction::Dstore2,
-            0x4a => Instruction::Dstore3,
-            0x67 => Instruction::Dsub,
-            0x59 => Instruction::Dup,
-            0x5a => Instruction::Dupx1(
+            0x90 => Operation::D2f,
+            0x8e => Operation::D2i,
+            0x8f => Operation::D2l,
+            0x63 => Operation::Dadd,
+            0x31 => Operation::Daload,
+            0x52 => Operation::Dastore,
+            0x98 => Operation::Dcmpg,
+            0x97 => Operation::Dcmpl,
+            0x0e => Operation::Dconst0,
+            0x0f => Operation::Dconst1,
+            0x6f => Operation::Ddiv,
+            0x18 => Operation::Dload(self.read_u1_with_count(&mut byte_read)?),
+            0x26 => Operation::Dload0,
+            0x27 => Operation::Dload1,
+            0x28 => Operation::Dload2,
+            0x29 => Operation::Dload3,
+            0x6b => Operation::Dmul,
+            0x77 => Operation::Dneg,
+            0x73 => Operation::Drem,
+            0xaf => Operation::Dreturn,
+            0x39 => Operation::Dstore(self.read_u1_with_count(&mut byte_read)?),
+            0x47 => Operation::Dstore0,
+            0x48 => Operation::Dstore1,
+            0x49 => Operation::Dstore2,
+            0x4a => Operation::Dstore3,
+            0x67 => Operation::Dsub,
+            0x59 => Operation::Dup,
+            0x5a => Operation::Dupx1(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x5b => Instruction::Dupx2(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x5c => Instruction::Dup2,
-            0x5d => Instruction::Dup2x1(
+            0x5b => Operation::Dupx2(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x5e => Instruction::Dup2x2,
-            0x8d => Instruction::F2d,
-            0x8b => Instruction::F2i,
-            0x8c => Instruction::F2l,
-            0x62 => Instruction::Fadd,
-            0x30 => Instruction::Faload,
-            0x51 => Instruction::Fastore,
-            0x96 => Instruction::Fcmpg,
-            0x95 => Instruction::Fcmpl,
-            0x0b => Instruction::Fconst0,
-            0x0c => Instruction::Fconst1,
-            0x0d => Instruction::Fconst2,
-            0x6e => Instruction::Fdiv,
-            0x17 => Instruction::Fload(self.read_u1_with_count(&mut byte_read)?),
-            0x22 => Instruction::Fload0,
-            0x23 => Instruction::Fload1,
-            0x24 => Instruction::Fload2,
-            0x25 => Instruction::Fload3,
-            0x6a => Instruction::Fmul,
-            0x76 => Instruction::Fneg,
-            0x72 => Instruction::Frem,
-            0xae => Instruction::Freturn,
-            0x38 => Instruction::Fstore(self.read_u1_with_count(&mut byte_read)?),
-            0x43 => Instruction::Fstore0,
-            0x44 => Instruction::Fstore1,
-            0x45 => Instruction::Fstore2,
-            0x46 => Instruction::Fstore3,
-            0x66 => Instruction::Fsub,
-            0xb4 => Instruction::Getfield(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xb2 => Instruction::Getstatic(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xa7 => Instruction::Goto(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xc8 => Instruction::Gotow(
-                self.read_u1_with_count(&mut byte_read)?,
+            0x5c => Operation::Dup2,
+            0x5d => Operation::Dup2x1(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x91 => Instruction::I2b,
-            0x92 => Instruction::I2c,
-            0x87 => Instruction::I2d,
-            0x86 => Instruction::I2f,
-            0x85 => Instruction::I2l,
-            0x93 => Instruction::I2s,
-            0x60 => Instruction::Iadd,
-            0x2e => Instruction::Iaload,
-            0x7e => Instruction::Iand,
-            0x4f => Instruction::Iastore,
-            0x02 => Instruction::Iconstm1,
-            0x03 => Instruction::Iconst0,
-            0x04 => Instruction::Iconst1,
-            0x05 => Instruction::Iconst2,
-            0x06 => Instruction::Iconst3,
-            0x07 => Instruction::Iconst4,
-            0x08 => Instruction::Iconst5,
-            0x6c => Instruction::Idiv,
-            0xa5 => Instruction::Ifacmpeq(
+            0x5e => Operation::Dup2x2,
+            0x8d => Operation::F2d,
+            0x8b => Operation::F2i,
+            0x8c => Operation::F2l,
+            0x62 => Operation::Fadd,
+            0x30 => Operation::Faload,
+            0x51 => Operation::Fastore,
+            0x96 => Operation::Fcmpg,
+            0x95 => Operation::Fcmpl,
+            0x0b => Operation::Fconst0,
+            0x0c => Operation::Fconst1,
+            0x0d => Operation::Fconst2,
+            0x6e => Operation::Fdiv,
+            0x17 => Operation::Fload(self.read_u1_with_count(&mut byte_read)?),
+            0x22 => Operation::Fload0,
+            0x23 => Operation::Fload1,
+            0x24 => Operation::Fload2,
+            0x25 => Operation::Fload3,
+            0x6a => Operation::Fmul,
+            0x76 => Operation::Fneg,
+            0x72 => Operation::Frem,
+            0xae => Operation::Freturn,
+            0x38 => Operation::Fstore(self.read_u1_with_count(&mut byte_read)?),
+            0x43 => Operation::Fstore0,
+            0x44 => Operation::Fstore1,
+            0x45 => Operation::Fstore2,
+            0x46 => Operation::Fstore3,
+            0x66 => Operation::Fsub,
+            0xb4 => Operation::Getfield(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xa6 => Instruction::Ifacmpne(
+            0xb2 => Operation::Getstatic(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x9f => Instruction::Ificmpeq(
+            0xa7 => Operation::Goto(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xa2 => Instruction::Ificmpge(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xa3 => Instruction::Ificmpgt(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xa4 => Instruction::Ificmple(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xa1 => Instruction::Ificmplt(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xa0 => Instruction::Ificmpne(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x99 => Instruction::Ifeq(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x9c => Instruction::Ifge(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x9d => Instruction::Ifgt(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x9e => Instruction::Ifle(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x9b => Instruction::Iflt(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x9a => Instruction::Ifne(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xc7 => Instruction::Ifnonnull(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xc6 => Instruction::Ifnull(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x84 => Instruction::Iinc(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x15 => Instruction::Iload(self.read_u1_with_count(&mut byte_read)?),
-            0x1a => Instruction::Iload0,
-            0x1b => Instruction::Iload1,
-            0x1c => Instruction::Iload2,
-            0x1d => Instruction::Iload3,
-            0xfe => Instruction::Impdep1,
-            0xff => Instruction::Impdep2,
-            0x68 => Instruction::Imul,
-            0x74 => Instruction::Ineg,
-            0xc1 => Instruction::Instanceof(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xba => Instruction::Invokedynamic(
+            0xc8 => Operation::Gotow(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xb9 => Instruction::Invokeinterface(
+            0x91 => Operation::I2b,
+            0x92 => Operation::I2c,
+            0x87 => Operation::I2d,
+            0x86 => Operation::I2f,
+            0x85 => Operation::I2l,
+            0x93 => Operation::I2s,
+            0x60 => Operation::Iadd,
+            0x2e => Operation::Iaload,
+            0x7e => Operation::Iand,
+            0x4f => Operation::Iastore,
+            0x02 => Operation::Iconstm1,
+            0x03 => Operation::Iconst0,
+            0x04 => Operation::Iconst1,
+            0x05 => Operation::Iconst2,
+            0x06 => Operation::Iconst3,
+            0x07 => Operation::Iconst4,
+            0x08 => Operation::Iconst5,
+            0x6c => Operation::Idiv,
+            0xa5 => Operation::Ifacmpeq(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa6 => Operation::Ifacmpne(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9f => Operation::Ificmpeq(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa2 => Operation::Ificmpge(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa3 => Operation::Ificmpgt(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa4 => Operation::Ificmple(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa1 => Operation::Ificmplt(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xa0 => Operation::Ificmpne(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x99 => Operation::Ifeq(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9c => Operation::Ifge(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9d => Operation::Ifgt(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9e => Operation::Ifle(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9b => Operation::Iflt(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x9a => Operation::Ifne(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xc7 => Operation::Ifnonnull(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xc6 => Operation::Ifnull(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x84 => Operation::Iinc(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x15 => Operation::Iload(self.read_u1_with_count(&mut byte_read)?),
+            0x1a => Operation::Iload0,
+            0x1b => Operation::Iload1,
+            0x1c => Operation::Iload2,
+            0x1d => Operation::Iload3,
+            0xfe => Operation::Impdep1,
+            0xff => Operation::Impdep2,
+            0x68 => Operation::Imul,
+            0x74 => Operation::Ineg,
+            0xc1 => Operation::Instanceof(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xba => Operation::Invokedynamic(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xb7 => Instruction::Invokespecial(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xb8 => Instruction::Invokestatic(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xb6 => Instruction::Invokevirtual(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0x80 => Instruction::Ior,
-            0x70 => Instruction::Irem,
-            0xac => Instruction::Ireturn,
-            0x78 => Instruction::Ishl,
-            0x7a => Instruction::Ishr,
-            0x36 => Instruction::Istore(self.read_u1_with_count(&mut byte_read)?),
-            0x3b => Instruction::Istore0,
-            0x3c => Instruction::Istore1,
-            0x3d => Instruction::Istore2,
-            0x3e => Instruction::Istore3,
-            0x64 => Instruction::Isub,
-            0x7c => Instruction::Iushr,
-            0x82 => Instruction::Ixor,
-            0xa8 => Instruction::Jsr(
-                self.read_u1_with_count(&mut byte_read)?,
-                self.read_u1_with_count(&mut byte_read)?,
-            ),
-            0xc9 => Instruction::Jsrw(
+            0xb9 => Operation::Invokeinterface(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x8a => Instruction::L2d,
-            0x89 => Instruction::L2f,
-            0x88 => Instruction::L2i,
-            0x61 => Instruction::Ladd,
-            0x2f => Instruction::Laload,
-            0x7f => Instruction::Land,
-            0x50 => Instruction::Lastore,
-            0x94 => Instruction::Lcmp,
-            0x09 => Instruction::Lconst0,
-            0x0a => Instruction::Lconst1,
-            0x12 => Instruction::Ldc(self.read_u1_with_count(&mut byte_read)?),
-            0x13 => Instruction::Ldcw(
+            0xb7 => Operation::Invokespecial(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x14 => Instruction::Ldc2w(
+            0xb8 => Operation::Invokestatic(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x6d => Instruction::Ldiv,
-            0x16 => Instruction::Lload(self.read_u1_with_count(&mut byte_read)?),
-            0x1e => Instruction::Lload0,
-            0x1f => Instruction::Lload1,
-            0x20 => Instruction::Lload2,
-            0x21 => Instruction::Lload3,
-            0x69 => Instruction::Lmul,
-            0x75 => Instruction::Lneg,
+            0xb6 => Operation::Invokevirtual(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x80 => Operation::Ior,
+            0x70 => Operation::Irem,
+            0xac => Operation::Ireturn,
+            0x78 => Operation::Ishl,
+            0x7a => Operation::Ishr,
+            0x36 => Operation::Istore(self.read_u1_with_count(&mut byte_read)?),
+            0x3b => Operation::Istore0,
+            0x3c => Operation::Istore1,
+            0x3d => Operation::Istore2,
+            0x3e => Operation::Istore3,
+            0x64 => Operation::Isub,
+            0x7c => Operation::Iushr,
+            0x82 => Operation::Ixor,
+            0xa8 => Operation::Jsr(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0xc9 => Operation::Jsrw(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x8a => Operation::L2d,
+            0x89 => Operation::L2f,
+            0x88 => Operation::L2i,
+            0x61 => Operation::Ladd,
+            0x2f => Operation::Laload,
+            0x7f => Operation::Land,
+            0x50 => Operation::Lastore,
+            0x94 => Operation::Lcmp,
+            0x09 => Operation::Lconst0,
+            0x0a => Operation::Lconst1,
+            0x12 => Operation::Ldc(self.read_u1_with_count(&mut byte_read)?),
+            0x13 => Operation::Ldcw(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x14 => Operation::Ldc2w(
+                self.read_u1_with_count(&mut byte_read)?,
+                self.read_u1_with_count(&mut byte_read)?,
+            ),
+            0x6d => Operation::Ldiv,
+            0x16 => Operation::Lload(self.read_u1_with_count(&mut byte_read)?),
+            0x1e => Operation::Lload0,
+            0x1f => Operation::Lload1,
+            0x20 => Operation::Lload2,
+            0x21 => Operation::Lload3,
+            0x69 => Operation::Lmul,
+            0x75 => Operation::Lneg,
             0xab => {
                 byte_read += LOOKUP_SWITCH_OPERAND_COUNT as U4;
-                Instruction::Lookupswitch(self.read_n_bytes(LOOKUP_SWITCH_OPERAND_COUNT)?)
+                Operation::Lookupswitch(self.read_n_bytes(LOOKUP_SWITCH_OPERAND_COUNT)?)
             }
-            0x81 => Instruction::Lor,
-            0x71 => Instruction::Lrem,
-            0xad => Instruction::Lreturn,
-            0x79 => Instruction::Lshl,
-            0x7b => Instruction::Lshr,
-            0x37 => Instruction::Lstore(self.read_u1_with_count(&mut byte_read)?),
-            0x3f => Instruction::Lstore0,
-            0x40 => Instruction::Lstore1,
-            0x41 => Instruction::Lstore2,
-            0x42 => Instruction::Lstore3,
-            0x65 => Instruction::Lsub,
-            0x7d => Instruction::Lushr,
-            0x83 => Instruction::Lxor,
-            0xc2 => Instruction::Monitorenter,
-            0xc3 => Instruction::Monitorexit,
-            0xc5 => Instruction::Multianewarray(
+            0x81 => Operation::Lor,
+            0x71 => Operation::Lrem,
+            0xad => Operation::Lreturn,
+            0x79 => Operation::Lshl,
+            0x7b => Operation::Lshr,
+            0x37 => Operation::Lstore(self.read_u1_with_count(&mut byte_read)?),
+            0x3f => Operation::Lstore0,
+            0x40 => Operation::Lstore1,
+            0x41 => Operation::Lstore2,
+            0x42 => Operation::Lstore3,
+            0x65 => Operation::Lsub,
+            0x7d => Operation::Lushr,
+            0x83 => Operation::Lxor,
+            0xc2 => Operation::Monitorenter,
+            0xc3 => Operation::Monitorexit,
+            0xc5 => Operation::Multianewarray(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xbb => Instruction::New(
+            0xbb => Operation::New(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xbc => Instruction::Newarray(self.read_u1_with_count(&mut byte_read)?),
-            0x00 => Instruction::Nop,
-            0x57 => Instruction::Pop,
-            0x58 => Instruction::Pop2,
-            0xb5 => Instruction::Putfield(
+            0xbc => Operation::Newarray(self.read_u1_with_count(&mut byte_read)?),
+            0x00 => Operation::Nop,
+            0x57 => Operation::Pop,
+            0x58 => Operation::Pop2,
+            0xb5 => Operation::Putfield(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xb3 => Instruction::Putstatic(
+            0xb3 => Operation::Putstatic(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0xa9 => Instruction::Ret(self.read_u1_with_count(&mut byte_read)?),
-            0xb1 => Instruction::Return,
-            0x35 => Instruction::Saload,
-            0x56 => Instruction::Sastore,
-            0x11 => Instruction::Sipush(
+            0xa9 => Operation::Ret(self.read_u1_with_count(&mut byte_read)?),
+            0xb1 => Operation::Return,
+            0x35 => Operation::Saload,
+            0x56 => Operation::Sastore,
+            0x11 => Operation::Sipush(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
-            0x5f => Instruction::Swap(
+            0x5f => Operation::Swap(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
             0xaa => {
                 byte_read += LOOKUP_SWITCH_OPERAND_COUNT as U4;
-                Instruction::Tableswitch(self.read_n_bytes(TABLE_SWITCH_OPERAND_COUNT)?)
+                Operation::Tableswitch(self.read_n_bytes(TABLE_SWITCH_OPERAND_COUNT)?)
             }
-            0xc4 => Instruction::Wide(
+            0xc4 => Operation::Wide(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,

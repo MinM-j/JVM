@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 use super::instruction::Instruction;
+use super::instruction::Operation;
 use super::types::*;
+use itertools::FoldWhile::{Continue, Done};
+use itertools::Itertools;
 //use std::fmt;
 
 #[derive(Debug)]
@@ -63,6 +66,23 @@ pub struct Code {
     pub code: Vec<Instruction>,                    //code_length
     pub exception_table: Vec<ExceptionTableEntry>, //exception_table_count
     pub attributes: Vec<AttributeInfo>,            //attributes_count
+}
+
+impl Code {
+    pub fn get_operation_at(&self, address: U4) -> Operation {
+        //TODO this is highly inefficient since in every iteration we need to linearly search
+        //This is just temporary solution for mid defense
+        self.code
+            .iter()
+            .find_map(|Instruction(instr_adress, operation)| {
+                if *instr_adress == address {
+                    Some(operation.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+    }
 }
 
 #[derive(Debug)]

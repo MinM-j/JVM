@@ -1,3 +1,5 @@
+use bitflags::Flags;
+
 use super::types::*;
 use super::{
     attribute::*,
@@ -5,6 +7,7 @@ use super::{
     class_version::ClassVersion,
     consant_pool::*,
     instruction::{Instruction, Operation},
+    access_flag::*,
 };
 
 use std::io::Cursor;
@@ -150,7 +153,7 @@ impl ClassFileReader {
 
     fn parse_access_flags(&mut self) -> Result<()> {
         let flags = self.read_u2()?;
-        self.class_file.access_flags = flags;
+        self.class_file.access_flags = ClassFlags::from_bits(flags).unwrap();
         Ok(())
     }
 
@@ -338,7 +341,8 @@ impl ClassFileReader {
     }
 
     fn parse_method_info(&mut self) -> Result<MethodInfo> {
-        let access_flags = self.read_u2()?;
+        let flag_value = self.read_u2()?;
+        let access_flags = MethodFlags::from_bits(flag_value).unwrap();
         let name_index = self.read_u2()?;
         let descriptor_index = self.read_u2()?;
         let attributes_count = self.read_u2()?;
@@ -360,7 +364,8 @@ impl ClassFileReader {
     }
 
     fn parse_field_info(&mut self) -> Result<FieldInfo> {
-        let access_flags = self.read_u2()?;
+        let flag_value = self.read_u2()?;
+        let access_flags = FieldFlags::from_bits(flag_value).unwrap();
         let name_index = self.read_u2()?;
         let descriptor_index = self.read_u2()?;
         let attributes_count = self.read_u2()?;

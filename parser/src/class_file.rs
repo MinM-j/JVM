@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use super::access_flag::ClassFlags;
 use super::attribute::*;
 use super::class_version::ClassVersion;
 use super::consant_pool::*;
@@ -10,7 +11,7 @@ pub struct ClassFile {
     pub magic: U4,
     pub version: ClassVersion,
     pub constant_pool: ConstantPool,
-    pub access_flags: U2,
+    pub access_flags: ClassFlags,
     pub this_class: U2,
     pub super_class: U2,
     pub interfaces: Vec<U2>,
@@ -38,5 +39,16 @@ impl ClassFile {
     pub fn get_super_class_name(&self) -> Option<&String> {
         self.constant_pool
             .get_underlying_string_from_constant_class_info_index(self.super_class)
+    }
+
+    pub fn get_interfaces_name(&self) -> Vec<&String> {
+        self.interfaces
+            .iter()
+            .map(|i| {
+                self.constant_pool
+                    .get_underlying_string_from_constant_class_info_index(*i)
+            })
+            .flatten()
+            .collect::<Vec<&String>>()
     }
 }

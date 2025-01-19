@@ -1,6 +1,6 @@
 // Your First Program
 
-class HelloWorld {
+class Hello {
   // Single field
   private int x; 
   public int y;

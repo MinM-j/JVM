@@ -1,3 +1,5 @@
+use crate::access_flag::FieldFlags;
+
 use super::access_flag::MethodFlags;
 use super::attribute::*;
 use super::types::*;
@@ -156,7 +158,7 @@ pub struct ConstantPackageInfo {
 //Debug
 #[derive(Debug)]
 pub struct MethodInfo {
-    pub access_flags: U2,
+    pub access_flags: MethodFlags,
     pub name_index: U2,
     pub descriptor_index: U2,
     pub attributes_count: U2, // MAYBE remove it?
@@ -171,11 +173,8 @@ impl<'a> MethodInfo {
     }
 
     pub fn is_main(&self, cp: &ConstantPool) -> bool {
-        let access_flag =
-            MethodFlags::from_bits(self.access_flags).expect("Error while creating MethodFlags");
-
         if self.get_name(&cp) == "main"
-            && access_flag.contains(MethodFlags::ACC_PUBLIC | MethodFlags::ACC_STATIC)
+            && self.access_flags.contains(MethodFlags::ACC_PUBLIC | MethodFlags::ACC_STATIC)
             && cp
                 .get_underlying_string_from_utf8_index(self.descriptor_index)
                 .unwrap()
@@ -201,7 +200,7 @@ impl<'a> MethodInfo {
 #[derive(Debug)]
 pub struct FieldInfo {
     //TODO change to MethodFlags
-    pub access_flags: U2,
+    pub access_flags: FieldFlags,
     pub name_index: U2,
     pub descriptor_index: U2,
     pub attributes_count: U2, // MAYBE remove it?

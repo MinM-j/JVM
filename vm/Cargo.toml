@@ -8,3 +8,4 @@ parser = {path = "../parser"}
 zip = { version = "2.2.0", features = ["deflate"] }
 typed-arena = "2.0.2"
 indexmap = "2.5.0"
+async-trait = "0.1.85"

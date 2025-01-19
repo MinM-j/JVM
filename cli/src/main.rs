@@ -1,10 +1,12 @@
 use std::fs;
 
 use parser::class_file_reader::ClassFileReader;
-use vm::vm::Value;
-use vm::vm::VM;
+use vm::class_loader::class_loader::ClassLoader;
+//use vm::vm::Value;
+//use vm::vm::VM;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = std::env::args().collect::<Vec<_>>();
 
     if args.len() < 3 {
@@ -13,18 +15,22 @@ fn main() {
 
     match args.get(1).unwrap().as_str() {
         "parse" => parse(&args[2].as_str()),
-        "run" => run(&args[2].as_str()),
+        "run" => run(&args[2].as_str()).await,
         cmd => panic!("command {} not implemented yet.", cmd),
     }
 }
 
-fn run(main_class: &str) {
-    let mut vm = VM::new();
+async fn run(main_class: &str) {
+ //   let mut vm = VM::new();
     // TODO provide args as string array
-    let start_args = vec![Value::Int(0)];
-    vm.start(main_class, start_args);
+   // let start_args = vec![Value::Int(0)];
+  //  vm.start(main_class, start_args);
     //let class = class_manager.get_or_resolve_class(main_class).unwrap();
-    println!("run {main_class}");
+    println!("{main_class}");
+    let mut class_loader = ClassLoader::new();
+    let _ = class_loader.add_directory_entry("test/".to_string());
+    let _ = class_loader.add_jar_entry(base.to_string());
+    let _ = class_loader.load_class(main_class).await;
     //dbg!(class);
 }
 
@@ -41,3 +47,5 @@ fn parse(class: &str) {
 
     println!("Parsing completed");
 }
+
+const base:&str = "/usr/lib/jvm/java-23-openjdk/jmods/java.base.jmod";

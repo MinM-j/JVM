@@ -1,6 +1,6 @@
 // https://en.wikipedia.org/wiki/ListofJavabytecode_instructions
 use super::types::*;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction(pub U4, pub Operation); //U2 = address
 
 #[derive(Debug, Clone)]
@@ -178,7 +178,8 @@ pub enum Operation {
     Lload3,
     Lmul,
     Lneg,
-    Lookupswitch(Vec<u8>), //8
+    //Lookupswitch(Vec<u8>), //8
+    Lookupswitch(i32, i32, Vec<(i32, i32)>),
     Lor,
     Lrem,
     Lreturn,
@@ -208,6 +209,7 @@ pub enum Operation {
     Sastore,
     Sipush(u8, u8),
     Swap(u8, u8),
-    Tableswitch(Vec<u8>), //16
+    //Tableswitch(Vec<u8>),
+    Tableswitch(i32, i32, i32, Vec<i32>),
     Wide(u8, u8, u8),
 }

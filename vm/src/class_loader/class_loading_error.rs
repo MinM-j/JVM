@@ -29,6 +29,8 @@ pub enum ClassLoadingError {
     ParseError(String),
     InvalidJarFile(String),
     NetworkError(String),
+
+    Other(String),
 }
 
 impl fmt::Display for ClassLoadingError {
@@ -40,21 +42,31 @@ impl fmt::Display for ClassLoadingError {
             ClassLoadingError::UnsupportedClassVersionError(msg) => {
                 write!(f, "Unsupported class version error: {}", msg)
             }
-            ClassLoadingError::NoClassDefFoundError(msg) => write!(f, "No class definition found error: {}", msg),
+            ClassLoadingError::NoClassDefFoundError(msg) => {
+                write!(f, "No class definition found error: {}", msg)
+            }
             ClassLoadingError::IncompatibleClassChangeError(msg) => {
                 write!(f, "Incompatible class change error: {}", msg)
             }
 
             // Resolution errors
-            ClassLoadingError::ClassCircularityError(msg) => write!(f, "Class circularity error: {}", msg),
-            ClassLoadingError::IllegalAccessError(msg) => write!(f, "Illegal access error: {}", msg),
+            ClassLoadingError::ClassCircularityError(msg) => {
+                write!(f, "Class circularity error: {}", msg)
+            }
+            ClassLoadingError::IllegalAccessError(msg) => {
+                write!(f, "Illegal access error: {}", msg)
+            }
             ClassLoadingError::NoSuchFieldError(msg) => write!(f, "No such field error: {}", msg),
             ClassLoadingError::NoSuchMethodError(msg) => write!(f, "No such method error: {}", msg),
             ClassLoadingError::InstantiationError(msg) => write!(f, "Instantiation error: {}", msg),
-            ClassLoadingError::AbstractMethodError(msg) => write!(f, "Abstract method error: {}", msg),
+            ClassLoadingError::AbstractMethodError(msg) => {
+                write!(f, "Abstract method error: {}", msg)
+            }
 
             // Runtime errors
-            ClassLoadingError::ClassNotFoundException(msg) => write!(f, "Class not found exception: {}", msg),
+            ClassLoadingError::ClassNotFoundException(msg) => {
+                write!(f, "Class not found exception: {}", msg)
+            }
             ClassLoadingError::SecurityException(msg) => write!(f, "Security exception: {}", msg),
             ClassLoadingError::OutOfMemoryError(msg) => write!(f, "Out of memory error: {}", msg),
 
@@ -63,6 +75,8 @@ impl fmt::Display for ClassLoadingError {
             ClassLoadingError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             ClassLoadingError::InvalidJarFile(msg) => write!(f, "Invalid JAR file: {}", msg),
             ClassLoadingError::NetworkError(msg) => write!(f, "Network error: {}", msg),
+
+            ClassLoadingError::Other(msg) => write!(f, "Other error: {}", msg),
         }
     }
 }

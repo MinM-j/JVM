@@ -90,11 +90,12 @@ impl ClassLoader {
         let loaded_class = Arc::new(LoadedClass {
             class_name: class_name.to_string(),
             super_class: superclass,
-            interfaces: interfaces,
+            interfaces,
             fields: parsed_class.fields,
             methods: parsed_class.methods,
-            constant_pool: parsed_class.constant_pool,
+            constant_pool: Arc::new(parsed_class.constant_pool),
             access_flags: parsed_class.access_flags,
+            code_cache: HashMap::new().into(),
         });
         println!("{class_name} loaded");
 
@@ -142,36 +143,4 @@ impl ClassLoader {
 
         Ok(())
     }
-
-    /*
-    pub async fn initialize_class(&self, class: Arc<LoadedClass>) -> Result<(), ClassLoadingError> {
-        // Check if already initialized
-        if class.initialization_state == InitializationState::Initialized {
-            return Ok(());
-        }
-
-        // Initialize superclass first
-        if let Some(super_class_name) = &class.super_class {
-            let super_class = self.load_class(super_class_name).await?;
-            self.initialize_class(super_class).await?;
-        }
-
-        // Initialize interfaces
-        for interface in &class.loaded_interfaces {
-            self.initialize_class(Arc::clone(interface)).await?;
-        }
-
-        // Execute <clinit> if present
-        if let Some(clinit) = class
-            .methods
-            .iter()
-            .find(|m| m.name == "<clinit>" && m.descriptor == "()V")
-        {
-            // Execute class initialization method
-            // You'll need to implement bytecode execution here
-        }
-
-        Ok(())
-    }
-    */
 }

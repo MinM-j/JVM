@@ -172,6 +172,13 @@ impl<'a> MethodInfo {
             .as_str()
     }
 
+    pub fn get_des(&self, cp: &'a ConstantPool) -> &'a str {
+        cp.get_underlying_string_from_utf8_index(self.descriptor_index)
+            .unwrap()
+            .as_str()
+
+    }
+
     pub fn is_main(&self, cp: &ConstantPool) -> bool {
         if self.get_name(&cp) == "main"
             && self.access_flags.contains(MethodFlags::ACC_PUBLIC | MethodFlags::ACC_STATIC)
@@ -207,7 +214,7 @@ pub struct FieldInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ConstantPool(Vec<ConstantInfo>);
 
 impl ConstantPool {
@@ -236,6 +243,10 @@ impl ConstantPool {
             }
             _ => None,
         })
+    }
+
+    pub fn get_len(&self) -> usize {
+        self.0.len()
     }
 }
 

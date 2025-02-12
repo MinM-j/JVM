@@ -3,7 +3,7 @@
 use super::access_flag::ClassFlags;
 use super::attribute::*;
 use super::class_version::ClassVersion;
-use super::consant_pool::*;
+use super::constant_pool::*;
 use super::types::*;
 
 #[derive(Default, Debug)]

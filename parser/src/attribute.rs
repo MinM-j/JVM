@@ -4,9 +4,10 @@ use super::instruction::Operation;
 use super::types::*;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
+use std::collections::HashMap;
 //use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AttributeInfo {
     Attribute(RemainingAttribute),
     ConstantValue(ConstantValue),
@@ -17,7 +18,7 @@ pub enum AttributeInfo {
     NestMembers(NestMembers),
     PermitterSubclasses(PermitterSubclasses),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RemainingAttribute {
     pub attribute_name_index: U2,
     //attribute_length: U4, //length of info in bytes removed
@@ -38,7 +39,7 @@ pub struct RemainingAttribute {
 /// pub attribute_name_index: U2, // it is always ConstantValue
 /// attribute_length: U4, // it is always 2
 /// pub constant_value_index: U2, //store as struct tuple
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantValue(pub U2); //constant_value_index
 
 /// Code_attribute {
@@ -57,7 +58,7 @@ pub struct ConstantValue(pub U2); //constant_value_index
 /// u2 attributes_count;
 /// attribute_info attributes[attributes_count];
 /// }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Code {
     //pub attribute_name_index: U2,
     //pub attribute_length: U4,
@@ -66,9 +67,12 @@ pub struct Code {
     pub code: Vec<Instruction>,                    //code_length
     pub exception_table: Vec<ExceptionTableEntry>, //exception_table_count
     pub attributes: Vec<AttributeInfo>,            //attributes_count
+
+    pub address_to_index: HashMap<U4, usize>,
 }
 
 impl Code {
+    /*
     pub fn get_operation_at_address(&self, address: U4) -> Operation {
         //TODO this is highly inefficient since in every iteration we need to linearly search
         //This is just temporary solution for mid defense
@@ -83,14 +87,27 @@ impl Code {
             })
             .unwrap()
     }
+    */
+
+    pub fn get_index_at_address(&self, address: U4) -> usize {
+        *self
+            .address_to_index
+            .get(&address)
+            .unwrap_or_else(|| panic!("No instruction found at address {:?}", address))
+    }
 
     pub fn get_operation_at_index(&self, index: usize) -> Operation {
         let Instruction(_, operation) = self.code.get(index).unwrap();
         operation.clone()
     }
+
+    pub fn get_address_at_index(&self, index: usize) -> U4 {
+        let Instruction(address, _) = self.code.get(index).unwrap();
+        *address
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExceptionTableEntry {
     pub start_pc: U2,
     pub end_pc: U2,
@@ -98,10 +115,10 @@ pub struct ExceptionTableEntry {
     pub catch_type: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineNumberTable(pub Vec<LineNumberTableEntry>); // line_number_table_count
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineNumberTableEntry {
     pub start_pc: U2,
     pub line_number: U2,
@@ -115,20 +132,20 @@ pub struct StackMapTable(Vec<StackMapFrame>);
 #[derive(Debug)]
 pub struct StackMapFrame {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BootstrapMethod(pub Vec<BootstrapMethodEntry>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BootstrapMethodEntry {
     pub bootstrap_method_ref: U2,
     pub bootstrap_args: Vec<U2>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NestHost(pub U2); //host_class_index
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NestMembers(pub Vec<U2>); //classes
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PermitterSubclasses(pub Vec<U2>); //classes

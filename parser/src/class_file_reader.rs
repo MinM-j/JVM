@@ -2,12 +2,12 @@ use bitflags::Flags;
 
 use super::types::*;
 use super::{
+    access_flag::*,
     attribute::*,
     class_file::ClassFile,
     class_version::ClassVersion,
-    consant_pool::*,
+    constant_pool::*,
     instruction::{Instruction, Operation},
-    access_flag::*,
 };
 
 use std::io::Cursor;
@@ -456,12 +456,19 @@ impl ClassFileReader {
         let exception_table = self.parse_exception_table(exception_table_count)?;
         let attributes = self.parse_attributes()?;
 
+        let address_to_index = code
+            .iter()
+            .enumerate()
+            .map(|(index, Instruction(address, _))| (*address, index))
+            .collect();
+
         Ok(AttributeInfo::Code(Code {
             max_stack,
             max_locals,
             code,
             exception_table,
             attributes,
+            address_to_index,
         }))
     }
 
@@ -470,7 +477,7 @@ impl ClassFileReader {
         let mut address: U4 = 0;
         let mut instructions: Vec<Instruction> = Vec::with_capacity(code_length as usize);
         loop {
-            let (instr_bytes, instruction) = self.parse_instruction()?;
+            let (instr_bytes, instruction) = self.parse_instruction(&address)?;
             instructions.push(Instruction(address, instruction));
             address += instr_bytes;
             if address == code_length {
@@ -562,7 +569,7 @@ impl ClassFileReader {
         )))
     }
 
-    fn parse_instruction(&mut self) -> Result<(U4, Operation)> {
+    fn parse_instruction(&mut self, address: &U4) -> Result<(U4, Operation)> {
         const LOOKUP_SWITCH_OPERAND_COUNT: usize = 8;
         const TABLE_SWITCH_OPERAND_COUNT: usize = 16;
 
@@ -860,10 +867,60 @@ impl ClassFileReader {
             0x21 => Operation::Lload3,
             0x69 => Operation::Lmul,
             0x75 => Operation::Lneg,
+            /*
+                        0xab => {
+                            byte_read += LOOKUP_SWITCH_OPERAND_COUNT as U4;
+                            Operation::Lookupswitch(self.read_n_bytes(LOOKUP_SWITCH_OPERAND_COUNT)?)
+                        }
+            */
             0xab => {
-                byte_read += LOOKUP_SWITCH_OPERAND_COUNT as U4;
-                Operation::Lookupswitch(self.read_n_bytes(LOOKUP_SWITCH_OPERAND_COUNT)?)
+                let padding = (4 - ((address + 1) % 4)) % 4;
+
+                self.skip_padding(padding)?;
+                byte_read += padding;
+
+                let default_offset = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                byte_read += 4;
+
+                let npairs = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                if npairs < 0 {
+                    return Err(std::io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!("lookupswitch npairs is negative: {}", npairs),
+                    ));
+                }
+
+                byte_read += 4;
+
+                let mut pairs = Vec::with_capacity(npairs as usize);
+                let mut last_match: Option<i32> = None;
+
+                for _ in 0..npairs {
+                    let match_value = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                    byte_read += 4;
+
+                    let offset = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                    byte_read += 4;
+
+                    if let Some(last) = last_match {
+                        if match_value <= last {
+                            return Err(std::io::Error::new(
+                                ErrorKind::InvalidData,
+                                format!(
+                        "lookupswitch match values not in strictly increasing order: {} follows {}",
+                        match_value, last
+                    ),
+                            ));
+                        }
+                    }
+
+                    pairs.push((match_value, offset));
+                    last_match = Some(match_value);
+                }
+
+                Operation::Lookupswitch(default_offset, npairs, pairs)
             }
+
             0x81 => Operation::Lor,
             0x71 => Operation::Lrem,
             0xad => Operation::Lreturn,
@@ -912,10 +969,45 @@ impl ClassFileReader {
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
             ),
+            /*
             0xaa => {
                 byte_read += LOOKUP_SWITCH_OPERAND_COUNT as U4;
                 Operation::Tableswitch(self.read_n_bytes(TABLE_SWITCH_OPERAND_COUNT)?)
             }
+            */
+            0xaa => {
+                let padding = (4 - ((address + 1) % 4)) % 4;
+                self.skip_padding(padding)?;
+                byte_read += padding;
+
+                let default_offset = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                byte_read += 4;
+
+                let low = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                byte_read += 4;
+
+                let high = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                byte_read += 4;
+
+                if low > high {
+                    return Err(std::io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!("tableswitch low ({}) is greater than high ({})", low, high),
+                    ));
+                }
+
+                let num_offsets = (high - low + 1) as usize;
+
+                let mut jump_offsets = Vec::with_capacity(num_offsets);
+                for _ in 0..num_offsets {
+                    let offset = i32::from_be_bytes(self.read_n_bytes(4)?.try_into().unwrap());
+                    byte_read += 4;
+                    jump_offsets.push(offset);
+                }
+
+                Operation::Tableswitch(default_offset, low, high, jump_offsets)
+            }
+
             0xc4 => Operation::Wide(
                 self.read_u1_with_count(&mut byte_read)?,
                 self.read_u1_with_count(&mut byte_read)?,
@@ -929,6 +1021,13 @@ impl ClassFileReader {
             }
         };
         Ok((byte_read, instruction))
+    }
+
+    fn skip_padding(&mut self, padding: U4) -> Result<()> {
+        for _ in 0..padding {
+            self.read_u1()?;
+        }
+        Ok(())
     }
 }
 /*

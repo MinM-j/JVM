@@ -1,5 +1,6 @@
 use crate::jvm_error::JVMError;
 use crate::runtime::*;
+use super::execute::ExecutionResult;
 
 impl Frame {
     pub fn ensure_operands(&self, required: usize) -> Result<(), JVMError> {
@@ -22,34 +23,37 @@ impl Frame {
         }
     }
 
-    pub fn iadd(&mut self) -> Result<(), JVMError> {
+    pub fn iadd(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
 
         let result = v1.checked_add(v2).ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn isub(&mut self) -> Result<(), JVMError> {
+    pub fn isub(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
 
         let result = v1.checked_sub(v2).ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn imul(&mut self) -> Result<(), JVMError> {
+    pub fn imul(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
 
         let result = v1.checked_mul(v2).ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn idiv(&mut self) -> Result<(), JVMError> {
+    pub fn idiv(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
@@ -58,10 +62,11 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         let result = v1.checked_div(v2).ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn irem(&mut self) -> Result<(), JVMError> {
+    pub fn irem(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
@@ -70,18 +75,20 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         let result = v1.checked_rem(v2).ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn ineg(&mut self) -> Result<(), JVMError> {
+    pub fn ineg(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(1)?;
         let v = self.pop_expect_int()?;
 
         let result = v.checked_neg().ok_or(JVMError::ArithmeticOverflow)?;
-        self.push(Value::Int(result))
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn iinc(&mut self, index: u8, value: i8) -> Result<(), JVMError> {
+    pub fn iinc(&mut self, index: u8, value: i8) -> Result<ExecutionResult, JVMError> {
         let current = match self.get_local(index as usize).cloned() {
             Some(Value::Int(val)) => val,
             Some(other) => {
@@ -101,7 +108,7 @@ impl Frame {
             .checked_add(value as i32)
             .ok_or(JVMError::ArithmeticOverflow)?;
         self.set_local(index as usize, Value::Int(result));
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
     pub fn pop_expect_long(&mut self) -> Result<i64, JVMError> {
@@ -114,34 +121,34 @@ impl Frame {
         }
     }
 
-    pub fn ladd(&mut self) -> Result<(), JVMError> {
+    pub fn ladd(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
         let result = v1.checked_add(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn lsub(&mut self) -> Result<(), JVMError> {
+    pub fn lsub(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
         let result = v1.checked_sub(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn lmul(&mut self) -> Result<(), JVMError> {
+    pub fn lmul(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
         let result = v1.checked_mul(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn ldiv(&mut self) -> Result<(), JVMError> {
+    pub fn ldiv(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
@@ -150,10 +157,10 @@ impl Frame {
         }
         let result = v1.checked_div(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn lrem(&mut self) -> Result<(), JVMError> {
+    pub fn lrem(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
@@ -162,15 +169,15 @@ impl Frame {
         }
         let result = v1.checked_rem(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn lneg(&mut self) -> Result<(), JVMError> {
+    pub fn lneg(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(1)?;
         let v = self.pop_expect_long()?;
         let result = v.checked_neg().ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
     pub fn pop_expect_float(&mut self) -> Result<f32, JVMError> {
@@ -183,31 +190,31 @@ impl Frame {
         }
     }
 
-    pub fn fadd(&mut self) -> Result<(), JVMError> {
+    pub fn fadd(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
         self.push(Value::Float(v1 + v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn fsub(&mut self) -> Result<(), JVMError> {
+    pub fn fsub(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
         self.push(Value::Float(v1 - v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn fmul(&mut self) -> Result<(), JVMError> {
+    pub fn fmul(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
         self.push(Value::Float(v1 * v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn fdiv(&mut self) -> Result<(), JVMError> {
+    pub fn fdiv(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
@@ -215,10 +222,10 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Float(v1 / v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn frem(&mut self) -> Result<(), JVMError> {
+    pub fn frem(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
@@ -226,14 +233,14 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Float(v1 % v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn fneg(&mut self) -> Result<(), JVMError> {
+    pub fn fneg(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(1)?;
         let v = self.pop_expect_float()?;
         self.push(Value::Float(-v))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
     pub fn pop_expect_double(&mut self) -> Result<f64, JVMError> {
@@ -246,31 +253,31 @@ impl Frame {
         }
     }
 
-    pub fn dadd(&mut self) -> Result<(), JVMError> {
+    pub fn dadd(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
         self.push(Value::Double(v1 + v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn dsub(&mut self) -> Result<(), JVMError> {
+    pub fn dsub(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
         self.push(Value::Double(v1 - v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn dmul(&mut self) -> Result<(), JVMError> {
+    pub fn dmul(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
         self.push(Value::Double(v1 * v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn ddiv(&mut self) -> Result<(), JVMError> {
+    pub fn ddiv(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
@@ -278,10 +285,10 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Double(v1 / v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn drem(&mut self) -> Result<(), JVMError> {
+    pub fn drem(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
@@ -289,13 +296,13 @@ impl Frame {
             return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Double(v1 % v2))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn dneg(&mut self) -> Result<(), JVMError> {
+    pub fn dneg(&mut self) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(1)?;
         let v = self.pop_expect_double()?;
         self.push(Value::Double(-v))?;
-        Ok(())
+        Ok(ExecutionResult::Continue)
     }
 }

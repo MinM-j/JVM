@@ -3,23 +3,61 @@ use crate::runtime::*;
 use crate::vm::VM;
 use parser::instruction::Operation;
 
+#[derive(Debug)]
+pub enum ExecutionResult {
+    Continue,
+    Invoke(Frame),
+    Return(Option<Value>),
+}
+
 impl Stack {
-    pub async fn execute_current_frame(&mut self, vm: &VM) -> Result<(), JVMError>{
-        let frame = self.current_frame()?;
-            loop {
-                frame.execute_instruction(&frame.code.get_operation_at_index(frame.pc), vm).await?;
-                frame.pc += 1;
-                if frame.pc == frame.code.code.len() {
-                    break;
+    pub async fn execute_current_frame(&mut self, vm: &VM) -> Result<(), JVMError> {
+        if self.frames.is_empty() {
+            return Err(JVMError::NoFrame);
+        }
+        let frame_index = self.frames.len() - 1;
+        while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
+            let operation = self.frames[frame_index]
+                .code
+                .get_operation_at_index(self.frames[frame_index].pc);
+            match self.frames[frame_index]
+                .execute_instruction(&operation, vm)
+                .await?
+            {
+                ExecutionResult::Continue => {
+                    self.frames[frame_index].pc += 1;
+                }
+                ExecutionResult::Invoke(new_frame) => {
+                    self.push_frame(new_frame)?;
+                    let fut = Box::pin(self.execute_current_frame(vm));
+                    fut.await?;
+                    self.frames[frame_index].pc += 1;
+                }
+                ExecutionResult::Return(return_value) => {
+                    if frame_index == 0 {
+                        println!("{:?}", self.frames[frame_index].locals);
+                        return Ok(());
+                    }
+                    println!("{:?}", self.frames[frame_index].locals);
+                    self.pop_frame()?;
+                    if let Some(value) = return_value {
+                        self.frames[frame_index - 1].push(value)?;
+                    }
+                    return Ok(());
                 }
             }
-            println!("{:?}", frame.locals);
+        }
+        println!("{:?}", self.frames[frame_index].locals);
         Ok(())
     }
 }
 impl Frame {
-    pub async fn execute_instruction(&mut self, operation: &Operation, vm: &VM) -> Result<(), JVMError>{
-        match operation {
+    pub async fn execute_instruction(
+        &mut self,
+        operation: &Operation,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
+        let return_op_type = match operation {
             // Load Instructions
             Operation::Iload(index) => self.iload(*index)?,
             Operation::Lload(index) => self.lload(*index)?,
@@ -95,7 +133,9 @@ impl Frame {
                 self.sipush(((*index1 as i16) << 8) | *index2 as i16)?
             }
             Operation::Ldc(index) => self.ldc(*index)?,
-            Operation::Ldcw(index1, index2) => self.ldc_w(((*index1 as u16) << 8) | *index2 as u16)?,
+            Operation::Ldcw(index1, index2) => {
+                self.ldc_w(((*index1 as u16) << 8) | *index2 as u16)?
+            }
             Operation::Ldc2w(index1, index2) => {
                 self.ldc2_w(((*index1 as u16) << 8) | *index2 as u16)?
             }
@@ -134,12 +174,24 @@ impl Frame {
             Operation::Dneg => self.dneg()?,
 
             // Comparison branches
-            Operation::Ifeq(index1, index2) => self.ifeq(((*index1 as i16) << 8) | *index2 as i16)?,
-            Operation::Ifne(index1, index2) => self.ifne(((*index1 as i16) << 8) | *index2 as i16)?,
-            Operation::Iflt(index1, index2) => self.iflt(((*index1 as i16) << 8) | *index2 as i16)?,
-            Operation::Ifge(index1, index2) => self.ifge(((*index1 as i16) << 8) | *index2 as i16)?,
-            Operation::Ifgt(index1, index2) => self.ifgt(((*index1 as i16) << 8) | *index2 as i16)?,
-            Operation::Ifle(index1, index2) => self.ifle(((*index1 as i16) << 8) | *index2 as i16)?,
+            Operation::Ifeq(index1, index2) => {
+                self.ifeq(((*index1 as i16) << 8) | *index2 as i16)?
+            }
+            Operation::Ifne(index1, index2) => {
+                self.ifne(((*index1 as i16) << 8) | *index2 as i16)?
+            }
+            Operation::Iflt(index1, index2) => {
+                self.iflt(((*index1 as i16) << 8) | *index2 as i16)?
+            }
+            Operation::Ifge(index1, index2) => {
+                self.ifge(((*index1 as i16) << 8) | *index2 as i16)?
+            }
+            Operation::Ifgt(index1, index2) => {
+                self.ifgt(((*index1 as i16) << 8) | *index2 as i16)?
+            }
+            Operation::Ifle(index1, index2) => {
+                self.ifle(((*index1 as i16) << 8) | *index2 as i16)?
+            }
 
             // Reference comparison
             Operation::Ifnull(index1, index2) => {
@@ -189,19 +241,29 @@ impl Frame {
             )?,
 
             // Switch statements
-            Operation::Tableswitch(default_offset, low, high, jump_offsets) => self.table_switch(*default_offset, *low, *high, jump_offsets)?,
-            Operation::Lookupswitch(default_offset, _, pairs) => self.lookup_switch(*default_offset, pairs)?,
+            Operation::Tableswitch(default_offset, low, high, jump_offsets) => {
+                self.table_switch(*default_offset, *low, *high, jump_offsets)?
+            }
+            Operation::Lookupswitch(default_offset, _, pairs) => {
+                self.lookup_switch(*default_offset, pairs)?
+            }
 
-            //Return statemetns
-            Operation::Return => self.return_void(vm)?,
-            Operation::Ireturn => self.return_int(vm)?,
-            Operation::Lreturn => self.return_long(vm)?,
-            Operation::Freturn => self.return_float(vm)?,
-            Operation::Dreturn => self.return_double(vm)?,
-            Operation::Areturn => self.return_reference(vm)?,
+            //Return statements
+            Operation::Return => self.return_void()?,
+            Operation::Ireturn => self.return_int()?,
+            Operation::Lreturn => self.return_long()?,
+            Operation::Freturn => self.return_float()?,
+            Operation::Dreturn => self.return_double()?,
+            Operation::Areturn => self.return_reference()?,
 
-            _ => println!("Instruction not implemented: {:?}", operation),
-        }
-        Ok(())
+            //Invoke statements
+            Operation::Invokestatic(index1, index2) => self.invokestatic(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
+
+            _ => {
+                println!("Instruction not implemented: {:?}", operation);
+                ExecutionResult::Continue
+            }
+        };
+        Ok(return_op_type)
     }
 }

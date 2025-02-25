@@ -1,15 +1,17 @@
 use crate::runtime::*;
 use crate::jvm_error::JVMError;
 
+use super::execute::ExecutionResult;
+
 impl Frame {
-    pub fn istore(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn istore(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.pop()? {
             Value::Int(value) => {
                 self.locals[index] = Value::Int(value);
-                Ok(())
+                Ok(ExecutionResult::Continue)
             }
             other => Err(JVMError::TypeMismatch {
                 expected: "int",
@@ -18,14 +20,14 @@ impl Frame {
         }
     }
 
-    pub fn lstore(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn lstore(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.pop()? {
             Value::Long(value) => {
                 self.locals[index] = Value::Long(value);
-                Ok(())
+                Ok(ExecutionResult::Continue)
             }
             other => Err(JVMError::TypeMismatch {
                 expected: "long",
@@ -34,14 +36,14 @@ impl Frame {
         }
     }
 
-    pub fn fstore(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn fstore(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.pop()? {
             Value::Float(value) => {
                 self.locals[index] = Value::Float(value);
-                Ok(())
+                Ok(ExecutionResult::Continue)
             }
             other => Err(JVMError::TypeMismatch {
                 expected: "float",
@@ -50,14 +52,14 @@ impl Frame {
         }
     }
 
-    pub fn dstore(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn dstore(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.pop()? {
             Value::Double(value) => {
                 self.locals[index] = Value::Double(value);
-                Ok(())
+                Ok(ExecutionResult::Continue)
             }
             other => Err(JVMError::TypeMismatch {
                 expected: "double",
@@ -66,14 +68,14 @@ impl Frame {
         }
     }
 
-    pub fn astore(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn astore(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.pop()? {
             Value::Reference(value) => {
                 self.locals[index] = Value::Reference(value);
-                Ok(())
+                Ok(ExecutionResult::Continue)
             }
             other => Err(JVMError::TypeMismatch {
                 expected: "reference",

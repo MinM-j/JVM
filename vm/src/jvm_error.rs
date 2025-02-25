@@ -40,6 +40,21 @@ pub enum JVMError {
 
     InvalidOffset(i32),
 
+    MethodNotFound {
+        class: String,
+        name: String,
+        descriptor: String,
+    },
+    IncompatibleClass {
+        expected: String,
+        found: String,
+    },
+    AbstractMethodCall {
+        class: String,
+        name: String,
+        descriptor: String,
+    },
+
     NoFrame,
     Other(String),
 }

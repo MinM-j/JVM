@@ -1,5 +1,7 @@
-use crate::runtime::*;
 use crate::jvm_error::JVMError;
+use crate::runtime::*;
+
+use super::execute::ExecutionResult;
 
 impl Frame {
     pub fn check_local_index(&self, index: usize) -> Result<(), JVMError> {
@@ -23,71 +25,94 @@ impl Frame {
         }
     }
 
-    pub fn iload(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn iload(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.locals[index] {
-            Value::Int(value) => self.push(Value::Int(value)),
-            ref other => Err(JVMError::TypeMismatch {
-                expected: "int",
-                found: Self::get_value_type(other),
-            }),
+            Value::Int(value) => {
+                self.push(Value::Int(value))?;
+            }
+            ref other => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "int",
+                    found: Self::get_value_type(other),
+                })
+            }
         }
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn lload(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn lload(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.locals[index] {
-            Value::Long(value) => self.push(Value::Long(value)),
-            ref other => Err(JVMError::TypeMismatch {
-                expected: "long",
-                found: Self::get_value_type(other),
-            }),
+            Value::Long(value) => {
+                self.push(Value::Long(value))?;
+            }
+            ref other => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "long",
+                    found: Self::get_value_type(other),
+                })
+            }
         }
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn fload(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn fload(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.locals[index] {
-            Value::Float(value) => self.push(Value::Float(value)),
-            ref other => Err(JVMError::TypeMismatch {
-                expected: "float",
-                found: Self::get_value_type(other),
-            }),
+            Value::Float(value) => {
+                self.push(Value::Float(value))?;
+            }
+            ref other => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "float",
+                    found: Self::get_value_type(other),
+                })
+            }
         }
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn dload(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn dload(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match self.locals[index] {
-            Value::Double(value) => self.push(Value::Double(value)),
-            ref other => Err(JVMError::TypeMismatch {
-                expected: "double",
-                found: Self::get_value_type(other),
-            }),
+            Value::Double(value) => {
+                self.push(Value::Double(value))?;
+            }
+            ref other => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "double",
+                    found: Self::get_value_type(other),
+                })
+            }
         }
+        Ok(ExecutionResult::Continue)
     }
 
-    pub fn aload(&mut self, index: u8) -> Result<(), JVMError> {
+    pub fn aload(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
         let index = index as usize;
         self.check_local_index(index)?;
 
         match &self.locals[index] {
             Value::Reference(_) => {
                 let value = self.locals[index].clone();
-                self.push(value)
+                self.push(value)?;
             }
-            ref other => Err(JVMError::TypeMismatch {
-                expected: "reference",
-                found: Self::get_value_type(other),
-            }),
+            ref other => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "reference",
+                    found: Self::get_value_type(other),
+                })
+            }
         }
+        Ok(ExecutionResult::Continue)
     }
 }

@@ -12,6 +12,7 @@ pub mod execute {
     pub mod execute_athimetic;
     pub mod execute_branch;
     pub mod execute_return;
+    pub mod execute_method;
 }
 pub mod runtime;
 pub mod vm;

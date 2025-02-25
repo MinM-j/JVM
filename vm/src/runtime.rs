@@ -1,8 +1,8 @@
 use super::class_loader::loaded_class::{LoadedClass, NameDes};
+use super::jvm_error::JVMError;
 use parser::attribute::Code;
 use parser::constant_pool::ConstantPool;
 use std::{collections::HashMap, sync::Arc};
-use super::jvm_error::JVMError;
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -31,19 +31,18 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(class: Arc<LoadedClass>, name_des: &NameDes) -> Self {
-        let temp_code = class.get_code_from_method(&name_des);
+    pub fn new(class: Arc<LoadedClass>, name_des: &NameDes, code: Arc<Code>) -> Self {
         Frame {
             constant_pool: Arc::clone(&class.constant_pool),
             method_name_des: name_des.clone(),
-            code: Arc::clone(&temp_code),
+            code: Arc::clone(&code),
             pc: 0,
-            locals: vec![Value::Default; temp_code.max_locals.into()],
-            operands: Vec::with_capacity(temp_code.max_stack.into()),
+            locals: vec![Value::Default; code.max_locals.into()],
+            operands: Vec::with_capacity(code.max_stack.into()),
         }
     }
 
-    pub fn push(&mut self, value: Value) -> Result<(), JVMError>{
+    pub fn push(&mut self, value: Value) -> Result<(), JVMError> {
         if self.operands.len() >= self.code.max_stack as usize {
             return Err(JVMError::StackOverflow);
         }
@@ -90,10 +89,6 @@ impl Stack {
 
     pub fn pop_frame(&mut self) -> Result<Frame, JVMError> {
         self.frames.pop().ok_or(JVMError::StackUnderflow)
-    }
-
-    pub fn current_frame(&mut self) -> Result<&mut Frame, JVMError> {
-        self.frames.last_mut().ok_or(JVMError::NoFrame)
     }
 }
 

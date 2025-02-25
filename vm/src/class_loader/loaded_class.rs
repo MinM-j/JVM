@@ -28,22 +28,23 @@ impl LoadedClass {
         })
     }
 
-    pub fn get_code_from_method(&self, name_des: &NameDes) -> Arc<Code> {
+    pub fn get_code_from_method(&self, name_des: &NameDes) -> Option<Arc<Code>> {
         let mut cache = self.code_cache.lock().unwrap();
         if let Some(cached_code) = cache.get(&name_des) {
-            return Arc::clone(cached_code);
+            return Some(Arc::clone(cached_code));
         }
 
         let temp_code = self
             .get_method_info_from_name_and_descriptor(&name_des)
-            .and_then(|method_info| method_info.get_code_attribute())
-            .expect("Method doesn't have code");
+            .and_then(|method_info| method_info.get_code_attribute());
 
-        let arc_code = Arc::new(temp_code.clone());
-
-        cache.insert(name_des.clone(), Arc::clone(&arc_code));
-
-        arc_code
+        if let Some(code) = temp_code {
+            let arc_code = Arc::new(code.clone());
+            cache.insert(name_des.clone(), Arc::clone(&arc_code));
+            Some(arc_code)
+        } else {
+            None
+        }
     }
 }
 
@@ -60,7 +61,8 @@ impl NameDes {
                 .get_underlying_string_from_utf8_index(argu.name_index)
                 .unwrap()
                 .clone(),
-            des: cp.get_underlying_string_from_utf8_index(argu.descriptor_index)
+            des: cp
+                .get_underlying_string_from_utf8_index(argu.descriptor_index)
                 .unwrap()
                 .clone(),
         }

@@ -19,20 +19,37 @@ async fn main() {
     }
 }
 
-async fn run(main_class: &str) {
+async fn run(class: &str) {
     //   let mut vm = VM::new();
     // TODO provide args as string array
     // let start_args = vec![Value::Int(0)];
     //  vm.start(main_class, start_args);
     //let class = class_manager.get_or_resolve_class(main_class).unwrap();
-    println!("{main_class}");
+    println!("{class}");
     let mut vm = VM::new();
+    let main_class = add_prepare(&class, &mut vm);
     let _ = vm.class_loader.add_directory_entry("".to_string());
     //let _ = vm.class_loader.add_directory_entry("../Temp/java/".to_string());
     let _ = vm.class_loader.add_jar_entry(base.to_string());
-    let _ = vm.invoke_main(main_class).await;
+    let _ = vm.invoke_main(&main_class).await;
 
     //dbg!(class);
+}
+
+fn add_prepare(unprepared: &str, vm: &mut VM) -> String {
+    let trimmed_unprepared = if unprepared.ends_with(".class") {
+        &unprepared[..unprepared.len() - 6]
+    } else {
+        unprepared
+    };
+    if let Some(pos) = trimmed_unprepared.rfind("/") {
+        let main_class = &trimmed_unprepared[pos + 1..];
+        let entry = &trimmed_unprepared[..pos + 1];
+        let _ = vm.class_loader.add_directory_entry(entry.to_string());
+        main_class.to_string()
+    } else {
+        trimmed_unprepared.to_string()
+    }
 }
 
 fn parse(class: &str) {

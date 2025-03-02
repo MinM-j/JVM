@@ -35,8 +35,8 @@ impl Frame {
             }
             ref other => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "int",
-                    found: Self::get_value_type(other),
+                    expected: "int".to_string(),
+                    found: Self::get_value_type(other).to_string(),
                 })
             }
         }
@@ -53,8 +53,8 @@ impl Frame {
             }
             ref other => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "long",
-                    found: Self::get_value_type(other),
+                    expected: "long".to_string(),
+                    found: Self::get_value_type(other).to_string(),
                 })
             }
         }
@@ -71,8 +71,8 @@ impl Frame {
             }
             ref other => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "float",
-                    found: Self::get_value_type(other),
+                    expected: "float".to_string(),
+                    found: Self::get_value_type(other).to_string(),
                 })
             }
         }
@@ -89,8 +89,8 @@ impl Frame {
             }
             ref other => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "double",
-                    found: Self::get_value_type(other),
+                    expected: "double".to_string(),
+                    found: Self::get_value_type(other).to_string(),
                 })
             }
         }
@@ -108,8 +108,8 @@ impl Frame {
             }
             ref other => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "reference",
-                    found: Self::get_value_type(other),
+                    expected: "reference".to_string(),
+                    found: Self::get_value_type(other).to_string(),
                 })
             }
         }

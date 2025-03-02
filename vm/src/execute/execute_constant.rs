@@ -1,6 +1,6 @@
-use crate::jvm_error::JVMError;
 use crate::runtime::*;
-use parser::constant_pool::ConstantInfo;
+use crate::{jvm_error::JVMError, vm::VM};
+use parser::constant_pool::{ConstantClassInfo, ConstantInfo, ConstantStringInfo};
 
 use super::execute::ExecutionResult;
 
@@ -21,7 +21,11 @@ impl Frame {
             })
     }
 
-    pub fn load_constant(&mut self, index: u16) -> Result<ExecutionResult, JVMError> {
+    pub async fn load_constant(
+        &mut self,
+        index: u16,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let constant = self.get_constant(index)?;
 
         match constant {
@@ -31,7 +35,31 @@ impl Frame {
             ConstantInfo::Float(value) => {
                 self.push(Value::Float(value.0))?;
             }
-            //Todo! for string and class
+            ConstantInfo::String(ConstantStringInfo { string_index }) => {
+                let string_value = self
+                    .constant_pool
+                    .get_underlying_string_from_utf8_index(*string_index)
+                    .ok_or_else(|| {
+                        JVMError::Other(format!("Invalid string_index {}", string_index))
+                    })?;
+
+                let mut heap = vm.heap.write().await;
+                let string_ref = heap.allocate_string(vm, string_value).await?;
+                self.push(string_ref)?;
+            }
+            ConstantInfo::Class(ConstantClassInfo ( name_index )) => {
+                let class_name = self
+                    .constant_pool
+                    .get_underlying_string_from_utf8_index(*name_index)
+                    .ok_or_else(|| JVMError::Other(format!("Invalid name_index {}", name_index)))?;
+                
+                //let loaded_class = vm.class_loader.load_class(class_name, vm).await.unwrap();
+                
+                let class_ref = vm.allocate_object(class_name).await?;
+                
+                self.push(class_ref)?;
+            }
+
             other => {
                 return Err(JVMError::InvalidConstantType {
                     expected: "integer, float, string, or class",
@@ -77,13 +105,15 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn ldc(&mut self, index: u8) -> Result<ExecutionResult, JVMError> {
-        self.load_constant(index as u16)?;
+    pub async fn ldc(&mut self, index: u8, vm: &VM) -> Result<ExecutionResult, JVMError> {
+        let fut = Box::pin(self.load_constant(index as u16, vm));
+        fut.await?;
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn ldc_w(&mut self, index: u16) -> Result<ExecutionResult, JVMError> {
-        self.load_constant(index)?;
+    pub async fn ldc_w(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+        let fut = Box::pin(self.load_constant(index, vm));
+        fut.await?;
         Ok(ExecutionResult::Continue)
     }
 

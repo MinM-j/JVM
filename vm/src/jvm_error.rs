@@ -5,8 +5,8 @@ pub enum JVMError {
         max: usize,
     },
     TypeMismatch {
-        expected: &'static str,
-        found: &'static str,
+        expected: String,
+        found: String,
     },
     StackUnderflow,
     StackOverflow,
@@ -54,6 +54,8 @@ pub enum JVMError {
         name: String,
         descriptor: String,
     },
+
+    UncaughtException(String),
 
     NoFrame,
     Other(String),

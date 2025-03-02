@@ -776,6 +776,7 @@ dependencies = [
  "async-trait",
  "indexmap",
  "parser",
+ "tokio",
  "typed-arena",
  "zip",
 ]

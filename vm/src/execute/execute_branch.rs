@@ -1,5 +1,6 @@
 use super::execute::ExecutionResult;
 use crate::jvm_error::JVMError;
+use crate::object::Object;
 use crate::runtime::*;
 use std::sync::Arc;
 

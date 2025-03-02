@@ -25,13 +25,13 @@ async fn run(class: &str) {
     // let start_args = vec![Value::Int(0)];
     //  vm.start(main_class, start_args);
     //let class = class_manager.get_or_resolve_class(main_class).unwrap();
-    println!("{class}");
-    let mut vm = VM::new();
+//    println!("{class}");
+    let mut vm = VM::new(1024).await;
     let main_class = add_prepare(&class, &mut vm);
     let _ = vm.class_loader.add_directory_entry("".to_string());
     //let _ = vm.class_loader.add_directory_entry("../Temp/java/".to_string());
-    let _ = vm.class_loader.add_jar_entry(base.to_string());
-    let _ = vm.invoke_main(&main_class).await;
+    let damn = vm.invoke_main(&main_class).await;
+    println!("{:?}",damn);
 
     //dbg!(class);
 }
@@ -66,4 +66,3 @@ fn parse(class: &str) {
     println!("Parsing completed");
 }
 
-const base: &str = "/usr/lib/jvm/java-23-openjdk/jmods/java.base.jmod";

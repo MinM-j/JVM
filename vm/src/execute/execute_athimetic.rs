@@ -1,6 +1,7 @@
+use super::execute::ExecutionResult;
 use crate::jvm_error::JVMError;
 use crate::runtime::*;
-use super::execute::ExecutionResult;
+use crate::vm::VM;
 
 impl Frame {
     pub fn ensure_operands(&self, required: usize) -> Result<(), JVMError> {
@@ -53,13 +54,16 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn idiv(&mut self) -> Result<ExecutionResult, JVMError> {
+    pub async fn idiv(&mut self, vm: &VM) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_int()?;
         let v1 = self.pop_expect_int()?;
 
         if v2 == 0 {
-            return Err(JVMError::DivisionByZero);
+            //let fut = Box::pin(vm.allocate_object("java/lang/ArithmeticException"));
+            //let exception = fut.await?;
+            return Ok(ExecutionResult::Throw("java/lang/ArithmeticException".to_string()));
+            //return Err(JVMError::DivisionByZero);
         }
         let result = v1.checked_div(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Int(result))?;
@@ -93,8 +97,8 @@ impl Frame {
             Some(Value::Int(val)) => val,
             Some(other) => {
                 return Err(JVMError::TypeMismatch {
-                    expected: "Int",
-                    found: Self::get_value_type(&other),
+                    expected: "Int".to_string(),
+                    found: Self::get_value_type(&other).to_string(),
                 })
             }
             None => {
@@ -148,12 +152,15 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn ldiv(&mut self) -> Result<ExecutionResult, JVMError> {
+    pub async fn ldiv(&mut self, vm: &VM) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_long()?;
         let v1 = self.pop_expect_long()?;
         if v2 == 0 {
-            return Err(JVMError::DivisionByZero);
+            //let fut = Box::pin(vm.allocate_object("java/lang/ArithmeticException"));
+            //let exception = fut.await?;
+            return Ok(ExecutionResult::Throw("java/lang/ArithmeticException".to_string()));
+            //return Err(JVMError::DivisionByZero);
         }
         let result = v1.checked_div(v2).ok_or(JVMError::ArithmeticOverflow)?;
         self.push(Value::Long(result))?;
@@ -184,8 +191,8 @@ impl Frame {
         match self.pop()? {
             Value::Float(v) => Ok(v),
             other => Err(JVMError::TypeMismatch {
-                expected: "Float",
-                found: Self::get_value_type(&other),
+                expected: "Float".to_string(),
+                found: Self::get_value_type(&other).to_string(),
             }),
         }
     }
@@ -214,12 +221,15 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn fdiv(&mut self) -> Result<ExecutionResult, JVMError> {
+    pub async fn fdiv(&mut self, vm: &VM) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_float()?;
         let v1 = self.pop_expect_float()?;
         if v2 == 0.0 {
-            return Err(JVMError::DivisionByZero);
+            //let fut = Box::pin(vm.allocate_object("java/lang/ArithmeticException"));
+            //let exception = fut.await?;
+            return Ok(ExecutionResult::Throw("java/lang/ArithmeticException".to_string()));
+            //return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Float(v1 / v2))?;
         Ok(ExecutionResult::Continue)
@@ -243,12 +253,44 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
+    pub fn fcmpg(&mut self) -> Result<ExecutionResult, JVMError> {
+        let value1 = self.pop_expect_float()?;
+        let value2 = self.pop_expect_float()?;
+        let result = if value1.is_nan() || value2.is_nan() {
+            1
+        } else if value1 > value2 {
+            1
+        } else if value1 < value2 {
+            -1
+        } else {
+            0
+        };
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
+    }
+
+    pub fn fcmpl(&mut self) -> Result<ExecutionResult, JVMError> {
+        let value1 = self.pop_expect_float()?;
+        let value2 = self.pop_expect_float()?;
+        let result = if value1.is_nan() || value2.is_nan() {
+            -1
+        } else if value1 > value2 {
+            1
+        } else if value1 < value2 {
+            -1
+        } else {
+            0
+        };
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
+    }
+
     pub fn pop_expect_double(&mut self) -> Result<f64, JVMError> {
         match self.pop()? {
             Value::Double(v) => Ok(v),
             other => Err(JVMError::TypeMismatch {
-                expected: "Double",
-                found: Self::get_value_type(&other),
+                expected: "Double".to_string(),
+                found: Self::get_value_type(&other).to_string(),
             }),
         }
     }
@@ -277,12 +319,15 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn ddiv(&mut self) -> Result<ExecutionResult, JVMError> {
+    pub async fn ddiv(&mut self, vm: &VM) -> Result<ExecutionResult, JVMError> {
         self.ensure_operands(2)?;
         let v2 = self.pop_expect_double()?;
         let v1 = self.pop_expect_double()?;
         if v2 == 0.0 {
-            return Err(JVMError::DivisionByZero);
+            //let fut = Box::pin(vm.allocate_object("java/lang/ArithmeticException"));
+            //let exception = fut.await?;
+            return Ok(ExecutionResult::Throw("java/lang/ArithmeticException".to_string()));
+            //return Err(JVMError::DivisionByZero);
         }
         self.push(Value::Double(v1 / v2))?;
         Ok(ExecutionResult::Continue)
@@ -303,6 +348,38 @@ impl Frame {
         self.ensure_operands(1)?;
         let v = self.pop_expect_double()?;
         self.push(Value::Double(-v))?;
+        Ok(ExecutionResult::Continue)
+    }
+
+    pub fn dcmpg(&mut self) -> Result<ExecutionResult, JVMError> {
+        let value1 = self.pop_expect_double()?;
+        let value2 = self.pop_expect_double()?;
+        let result = if value1.is_nan() || value2.is_nan() {
+            1
+        } else if value1 > value2 {
+            1
+        } else if value1 < value2 {
+            -1
+        } else {
+            0
+        };
+        self.push(Value::Int(result))?;
+        Ok(ExecutionResult::Continue)
+    }
+
+    pub fn dcmpl(&mut self) -> Result<ExecutionResult, JVMError> {
+        let value1 = self.pop_expect_double()?;
+        let value2 = self.pop_expect_double()?;
+        let result = if value1.is_nan() || value2.is_nan() {
+            -1
+        } else if value1 > value2 {
+            1
+        } else if value1 < value2 {
+            -1
+        } else {
+            0
+        };
+        self.push(Value::Int(result))?;
         Ok(ExecutionResult::Continue)
     }
 }

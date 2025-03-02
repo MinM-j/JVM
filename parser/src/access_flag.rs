@@ -38,7 +38,7 @@ bitflags! {
 }
 
 bitflags! {
-    #[derive(Default, Debug)]
+    #[derive(Default, Debug, Clone)]
     pub struct FieldFlags: u16 {
         const ACC_PUBLIC = 0x0001;
         const ACC_PRIVATE = 0x0002;

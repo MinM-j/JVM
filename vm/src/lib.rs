@@ -13,7 +13,16 @@ pub mod execute {
     pub mod execute_branch;
     pub mod execute_return;
     pub mod execute_method;
+    pub mod execute_exception;
+    pub mod execute_field;
+    pub mod execute_object;
+    pub mod execute_array;
+    pub mod execute_convert;
+    pub mod execute_shift;
 }
 pub mod runtime;
 pub mod vm;
 pub mod jvm_error;
+pub mod object;
+pub mod heap;
+pub mod garbagge_collector;

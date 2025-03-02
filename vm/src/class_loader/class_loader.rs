@@ -1,6 +1,7 @@
 use super::class_loading_error::ClassLoadingError;
 use super::classpath_entry::*;
 use super::loaded_class::LoadedClass;
+use crate::vm::VM;
 use parser::access_flag::ClassFlags;
 use parser::class_file_reader::ClassFileReader;
 use std::collections::HashMap;
@@ -34,6 +35,7 @@ impl ClassLoader {
     pub async fn load_class(
         &self,
         class_name: &str,
+        vm: &VM,
     ) -> Result<Arc<LoadedClass>, ClassLoadingError> {
         if let Some(loaded_class) = self.find_loaded_class(class_name) {
             return Ok(loaded_class);
@@ -48,7 +50,7 @@ impl ClassLoader {
         let superclass = if class_name != "java/lang/Object" {
             match parsed_class.get_super_class_name() {
                 Some(super_class_name) => {
-                    let fut = Box::pin(self.load_class(super_class_name));
+                    let fut = Box::pin(self.load_class(super_class_name, vm));
                     match fut.await {
                         Ok(value) => Some(value),
                         Err(e) => {
@@ -67,7 +69,7 @@ impl ClassLoader {
 
         let mut interfaces = Vec::new();
         for interface_name in &parsed_class.get_interfaces_name() {
-            let fut = Box::pin(self.load_class(interface_name));
+            let fut = Box::pin(self.load_class(interface_name, vm));
             match fut.await {
                 Ok(interface) => {
                     if !interface.access_flags.contains(ClassFlags::ACC_INTERFACE) {
@@ -87,22 +89,24 @@ impl ClassLoader {
             }
         }
 
-        let loaded_class = Arc::new(LoadedClass {
-            class_name: class_name.to_string(),
-            super_class: superclass,
+        let loaded_class = Arc::new(LoadedClass::new(
+            class_name.to_string(),
+            superclass,
             interfaces,
-            fields: parsed_class.fields,
-            methods: parsed_class.methods,
-            constant_pool: Arc::new(parsed_class.constant_pool),
-            access_flags: parsed_class.access_flags,
-            code_cache: HashMap::new().into(),
-        });
-        println!("{class_name} loaded");
+            parsed_class.fields,
+            parsed_class.methods,
+            Arc::new(parsed_class.constant_pool),
+            parsed_class.access_flags,
+        ));
 
         self.loaded_classes
             .lock()
             .unwrap()
             .insert(class_name.to_string(), Arc::clone(&loaded_class));
+        //LoadedClass::initialize(loaded_class.clone(), vm)
+         //   .await
+          //  .unwrap();
+        //println!("{class_name} loaded");
 
         Ok(loaded_class)
     }

@@ -8,6 +8,7 @@ pub enum ExecutionResult {
     Continue,
     Invoke(Frame),
     Return(Option<Value>),
+    Throw(String),
 }
 
 impl Stack {
@@ -15,7 +16,7 @@ impl Stack {
         if self.frames.is_empty() {
             return Err(JVMError::NoFrame);
         }
-        let frame_index = self.frames.len() - 1;
+        let mut frame_index = self.frames.len() - 1;
         while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
             let operation = self.frames[frame_index]
                 .code
@@ -45,9 +46,70 @@ impl Stack {
                     }
                     return Ok(());
                 }
+                ExecutionResult::Throw(exception) => {
+                    if let Some(handler_pc) = self.frames[frame_index]
+                        .find_exception_handler(&exception, vm)
+                        .await
+                    {
+                        self.frames[frame_index].operands.clear();
+                        self.frames[frame_index].push(Value::Reference(None))?;
+                        self.frames[frame_index].pc = self.frames[frame_index]
+                            .code
+                            .get_index_at_address(handler_pc as u32);
+                    } else if frame_index > 0 {
+                        self.pop_frame()?;
+                        frame_index -= 1;
+                        if let Some(handler_pc) = self.frames[frame_index]
+                            .find_exception_handler(&exception, vm)
+                            .await
+                        {
+                            self.frames[frame_index].operands.clear();
+                            self.frames[frame_index].push(Value::Reference(None))?;
+                            self.frames[frame_index].pc = self.frames[frame_index]
+                                .code
+                                .get_index_at_address(handler_pc as u32);
+                        } else {
+                            if frame_index == 0 {
+                                return Err(JVMError::UncaughtException(exception));
+                            }
+                        }
+                    } else {
+                        println!("3");
+                        return Err(JVMError::UncaughtException(exception));
+                    }
+                    /*
+                    let exception_obj = match &exception {
+                        Value::Reference(Some(obj)) => obj,
+                        _ => unreachable!("athrow ensures this is a valid reference"),
+                    };
+                    if let Some(handler_pc) = self.frames[frame_index]
+                        .find_exception_handler(exception_obj, vm)
+                        .await
+                    {
+                        self.frames[frame_index].operands.clear();
+                        self.frames[frame_index].push(exception.clone())?;
+                        self.frames[frame_index].pc = self.frames[frame_index]
+                            .code
+                            .get_index_at_address(handler_pc as u32);
+                    } else if frame_index > 0 {
+                        self.pop_frame()?;
+                        self.frames[frame_index - 1].push(exception)?;
+                        frame_index -= 1;
+                    } else {
+                        let exception_class = match exception {
+                            Value::Reference(Some(obj)) => obj
+                                .class
+                                .as_ref()
+                                .map(|class| class.class_name.clone())
+                                .unwrap_or_default(),
+                            _ => "Unknown".to_string(),
+                        };
+                        return Err(JVMError::UncaughtException(exception_class));
+                    }
+                    */
+                }
             }
         }
-        println!("{:?}", self.frames[frame_index].locals);
         Ok(())
     }
 }
@@ -132,19 +194,34 @@ impl Frame {
             Operation::Sipush(index1, index2) => {
                 self.sipush(((*index1 as i16) << 8) | *index2 as i16)?
             }
-            Operation::Ldc(index) => self.ldc(*index)?,
+            Operation::Ldc(index) => self.ldc(*index, vm).await?,
             Operation::Ldcw(index1, index2) => {
-                self.ldc_w(((*index1 as u16) << 8) | *index2 as u16)?
+                self.ldc_w(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
             }
             Operation::Ldc2w(index1, index2) => {
                 self.ldc2_w(((*index1 as u16) << 8) | *index2 as u16)?
             }
 
+            //Shifting and bit-wise operations
+            Operation::Ishl => self.ishl()?,
+            Operation::Ishr => self.ishr()?,
+            Operation::Iushr => self.iushr()?,
+            Operation::Lshl => self.lshl()?,
+            Operation::Lshr => self.lshr()?,
+            Operation::Lushr => self.lushr()?,
+            Operation::Ior => self.ior()?,
+            Operation::Lor => self.lor()?,
+            Operation::Ixor => self.ixor()?,
+            Operation::Lxor => self.lxor()?,
+            Operation::Iand => self.iand()?,
+            Operation::Land => self.land()?,
+
             // Integer Arithmetic
             Operation::Iadd => self.iadd()?,
             Operation::Isub => self.isub()?,
             Operation::Imul => self.imul()?,
-            Operation::Idiv => self.idiv()?,
+            Operation::Idiv => self.idiv(vm).await?,
             Operation::Irem => self.irem()?,
             Operation::Ineg => self.ineg()?,
             Operation::Iinc(index, value) => self.iinc(*index, *value as i8)?,
@@ -153,7 +230,7 @@ impl Frame {
             Operation::Ladd => self.ladd()?,
             Operation::Lsub => self.lsub()?,
             Operation::Lmul => self.lmul()?,
-            Operation::Ldiv => self.ldiv()?,
+            Operation::Ldiv => self.ldiv(vm).await?,
             Operation::Lrem => self.lrem()?,
             Operation::Lneg => self.lneg()?,
 
@@ -161,17 +238,21 @@ impl Frame {
             Operation::Fadd => self.fadd()?,
             Operation::Fsub => self.fsub()?,
             Operation::Fmul => self.fmul()?,
-            Operation::Fdiv => self.fdiv()?,
+            Operation::Fdiv => self.fdiv(vm).await?,
             Operation::Frem => self.frem()?,
             Operation::Fneg => self.fneg()?,
+            Operation::Fcmpg => self.fcmpg()?,
+            Operation::Fcmpl => self.fcmpl()?,
 
             // Double Arithmetic
             Operation::Dadd => self.dadd()?,
             Operation::Dsub => self.dsub()?,
             Operation::Dmul => self.dmul()?,
-            Operation::Ddiv => self.ddiv()?,
+            Operation::Ddiv => self.ddiv(vm).await?,
             Operation::Drem => self.drem()?,
             Operation::Dneg => self.dneg()?,
+            Operation::Dcmpg => self.dcmpg()?,
+            Operation::Dcmpl => self.dcmpl()?,
 
             // Comparison branches
             Operation::Ifeq(index1, index2) => {
@@ -256,14 +337,102 @@ impl Frame {
             Operation::Dreturn => self.return_double()?,
             Operation::Areturn => self.return_reference()?,
 
+            //array instructions
+            Operation::Newarray(atype) => self.newarray(*atype, vm).await?,
+            Operation::Anewarray(index1, index2) => {
+                self.anewarray(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Iaload => self.array_load("I".to_string(), vm).await?,
+            Operation::Laload => self.array_load("J".to_string(), vm).await?,
+            Operation::Faload => self.array_load("F".to_string(), vm).await?,
+            Operation::Daload => self.array_load("D".to_string(), vm).await?,
+            Operation::Aaload => self.array_load("L".to_string(), vm).await?,
+            Operation::Baload => self.array_load("B".to_string(), vm).await?,
+            Operation::Caload => self.array_load("C".to_string(), vm).await?,
+            Operation::Saload => self.array_load("S".to_string(), vm).await?,
+            Operation::Iastore => self.array_store("I".to_string(), vm).await?,
+            Operation::Lastore => self.array_store("J".to_string(), vm).await?,
+            Operation::Fastore => self.array_store("F".to_string(), vm).await?,
+            Operation::Dastore => self.array_store("D".to_string(), vm).await?,
+            Operation::Aastore => self.array_store("L".to_string(), vm).await?,
+            Operation::Bastore => self.array_store("B".to_string(), vm).await?,
+            Operation::Castore => self.array_store("C".to_string(), vm).await?,
+            Operation::Sastore => self.array_store("S".to_string(), vm).await?,
+            Operation::Arraylength => self.arraylength().await?,
+
+            //objects instructions
+            Operation::New(index1, index2) => {
+                self.execute_new(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Dup => self.dup()?,
+            Operation::Dupx1 => self.dup_x1()?,
+            Operation::Dupx2 => self.dup_x2()?,
+            Operation::Dup2 => self.dup2()?,
+            Operation::Dup2x1 => self.dup2_x1()?,
+            Operation::Dup2x2 => self.dup2_x2()?,
+            Operation::Putfield(index1, index2) => {
+                self.putfield(((*index1 as u16) << 8) | *index2 as u16)
+                    .await?
+            }
+            Operation::Getfield(index1, index2) => {
+                self.getfield(((*index1 as u16) << 8) | *index2 as u16)
+                    .await?
+            }
+            Operation::Putstatic(index1, index2) => {
+                self.putstatic(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Getstatic(index1, index2) => {
+                self.getstatic(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+
             //Invoke statements
-            Operation::Invokestatic(index1, index2) => self.invokestatic(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
+            Operation::Invokestatic(index1, index2) => {
+                self.invokestatic(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Invokespecial(index1, index2) => {
+                self.invokespecial(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Invokevirtual(index1, index2) => {
+                self.invokevirtual(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Invokeinterface(index1, index2, _, _) => {
+                self.invokeinterface(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+
+            //convert instructions
+            Operation::I2l => self.convert("I".to_string(), "L".to_string())?,
+            Operation::I2f => self.convert("I".to_string(), "F".to_string())?,
+            Operation::I2d => self.convert("I".to_string(), "D".to_string())?,
+            Operation::L2i => self.convert("L".to_string(), "I".to_string())?,
+            Operation::L2f => self.convert("L".to_string(), "F".to_string())?,
+            Operation::L2d => self.convert("L".to_string(), "D".to_string())?,
+            Operation::F2i => self.convert("F".to_string(), "I".to_string())?,
+            Operation::F2l => self.convert("F".to_string(), "L".to_string())?,
+            Operation::F2d => self.convert("F".to_string(), "D".to_string())?,
+            Operation::D2i => self.convert("D".to_string(), "I".to_string())?,
+            Operation::D2l => self.convert("D".to_string(), "L".to_string())?,
+            Operation::D2f => self.convert("D".to_string(), "F".to_string())?,
+            Operation::I2b => self.convert("I".to_string(), "B".to_string())?,
+            Operation::I2c => self.convert("I".to_string(), "C".to_string())?,
+            Operation::I2s => self.convert("I".to_string(), "S".to_string())?,
+
+            //Execption
+            Operation::Athrow => self.athrow(vm).await?,
 
             _ => {
                 println!("Instruction not implemented: {:?}", operation);
                 ExecutionResult::Continue
             }
         };
+        //println!("{:?}", operation);
         Ok(return_op_type)
     }
 }

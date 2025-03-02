@@ -204,7 +204,7 @@ impl<'a> MethodInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldInfo {
     //TODO change to MethodFlags
     pub access_flags: FieldFlags,

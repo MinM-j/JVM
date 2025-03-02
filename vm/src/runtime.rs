@@ -1,5 +1,6 @@
 use super::class_loader::loaded_class::{LoadedClass, NameDes};
 use super::jvm_error::JVMError;
+use super::object::Object;
 use parser::attribute::Code;
 use parser::constant_pool::ConstantPool;
 use std::{collections::HashMap, sync::Arc};
@@ -14,12 +15,6 @@ pub enum Value {
     Reference(Option<Arc<Object>>),
 }
 
-#[derive(Clone, Debug)]
-pub struct Object {
-    pub class: Arc<LoadedClass>,
-    pub fields: HashMap<String, Value>,
-}
-
 #[derive(Debug)]
 pub struct Frame {
     pub constant_pool: Arc<ConstantPool>,
@@ -32,6 +27,7 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(class: Arc<LoadedClass>, name_des: &NameDes, code: Arc<Code>) -> Self {
+//        println!("{:}",class.class_name);
         Frame {
             constant_pool: Arc::clone(&class.constant_pool),
             method_name_des: name_des.clone(),
@@ -92,7 +88,3 @@ impl Stack {
     }
 }
 
-#[derive(Debug)]
-pub struct Heap {
-    pub objects: HashMap<usize, Object>,
-}

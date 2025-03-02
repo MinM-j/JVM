@@ -101,28 +101,29 @@ impl Frame {
     pub fn lookup_method(
         class: &Arc<LoadedClass>,
         name_des: &NameDes,
-    ) -> Result<Arc<Code>, JVMError> {
-        class
+    ) -> Result<(Arc<LoadedClass>, Arc<Code>), JVMError> {
+        let code = class
             .get_code_from_method(name_des)
             .ok_or_else(|| JVMError::MethodNotFound {
                 class: class.class_name.clone(),
                 name: name_des.name.clone(),
                 descriptor: name_des.des.clone(),
-            })
+            });
+        Ok((class.clone(), code?))
     }
 
     fn lookup_virtual_method(
         &self,
         class: &Arc<LoadedClass>,
         name_des: &NameDes,
-    ) -> Result<Arc<Code>, JVMError> {
+    ) -> Result<(Arc<LoadedClass>, Arc<Code>), JVMError> {
         if let Some(code) = class.get_code_from_method(name_des) {
-            return Ok(code);
+            return Ok((class.clone(), code));
         }
         let mut current_class = class.clone();
         while let Some(super_class) = &current_class.super_class {
             if let Some(code) = super_class.get_code_from_method(name_des) {
-                return Ok(code);
+                return Ok((super_class.clone(), code));
             }
             current_class = Arc::clone(super_class);
         }
@@ -142,77 +143,112 @@ impl Frame {
 
     pub async fn invokestatic(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
         let (class_name, name_des) = self.resolve_method_ref(index)?;
-        println!("{class_name}");
-        let target_class = vm
-            .class_loader
-            .load_class(&class_name)
+        let fut = Box::pin(vm.class_loader.load_class(&class_name, vm));
+
+        let target_class = fut
             .await
-            .map_err(|e| JVMError::Other(e.to_string())).unwrap();
-        let method_code = self.lookup_virtual_method(&target_class, &name_des)?;
+            .map_err(|e| JVMError::Other(e.to_string()))
+            .unwrap();
+        let (method_class, method_code) = self.lookup_virtual_method(&target_class, &name_des)?;
         let args = self.prepare_arguments(&name_des.des)?;
 
-        let mut new_frame = Frame::new(target_class, &name_des, method_code);
-        for (i, arg) in args.into_iter().enumerate() {
-            new_frame.set_local(i, arg);
+        let mut new_frame = Frame::new(method_class, &name_des, method_code);
+        let mut i = 0;
+        for arg in args.into_iter() {
+            new_frame.set_local(i, arg.clone());
+            if Self::get_value_type(&arg) == "double" || Self::get_value_type(&arg) == "long" {
+                i = i + 2;
+            } else {
+                i = i + 1;
+            }
         }
 
         Ok(ExecutionResult::Invoke(new_frame))
     }
 
-    pub async fn invokespecial(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn invokespecial(
+        &mut self,
+        index: u16,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let (class_name, name_des) = self.resolve_method_ref(index)?;
-        let target_class = vm.class_loader.load_class(&class_name).await
-            .map_err(|e| JVMError::Other(e.to_string()))?;
-        
-        let method_code = Self::lookup_method(&target_class, &name_des)?;
+        let fut = Box::pin(vm.class_loader.load_class(&class_name, vm));
+        let target_class = fut.await.map_err(|e| JVMError::Other(e.to_string()))?;
+        let (method_class, method_code) = Self::lookup_method(&target_class, &name_des)?;
         let mut args = self.prepare_arguments(&name_des.des)?;
         let object_ref = self.pop()?;
         match object_ref {
             Value::Reference(Some(obj)) => {
-                if !obj.class.class_name.eq(&class_name) {
-                    return Err(JVMError::IncompatibleClass {
-                        expected: class_name,
-                        found: obj.class.class_name.clone(),
-                    });
+                if let Some(obj_class) = &obj.class {
+                    if !self.is_compatible_class(obj_class, &class_name) {
+                        return Err(JVMError::IncompatibleClass {
+                            expected: class_name,
+                            found: obj_class.class_name.clone(),
+                        });
+                    }
                 }
                 args.insert(0, Value::Reference(Some(obj)));
             }
             Value::Reference(None) => return Err(JVMError::NullReference),
-            _ => return Err(JVMError::TypeMismatch {
-                expected: "Reference",
-                found: "non-reference",
-            }),
+            _ => {
+                return Err(JVMError::TypeMismatch {
+                    expected: "Reference".to_string(),
+                    found: "non-reference".to_string(),
+                })
+            }
         }
 
-        let mut new_frame = Frame::new(target_class, &name_des, method_code);
-        for (i, arg) in args.into_iter().enumerate() {
-            new_frame.set_local(i, arg);
+        let mut new_frame = Frame::new(method_class, &name_des, method_code);
+        let mut i = 0;
+        for arg in args.into_iter() {
+            new_frame.set_local(i, arg.clone());
+            if Self::get_value_type(&arg) == "double" || Self::get_value_type(&arg) == "long" {
+                i = i + 2;
+            } else {
+                i = i + 1;
+            }
         }
 
         Ok(ExecutionResult::Invoke(new_frame))
     }
 
-    pub async fn invokevirtual(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn invokevirtual(
+        &mut self,
+        index: u16,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let (class_name, name_des) = self.resolve_method_ref(index)?;
         let mut args = self.prepare_arguments(&name_des.des)?;
         let object_ref = self.pop()?;
         match object_ref {
-            Value::Reference(Some(obj)) => {
-                let target_class = Arc::clone(&obj.class);
-                let method_code = self.lookup_virtual_method(&target_class, &name_des)?;
-                args.insert(0, Value::Reference(Some(obj)));
+            Value::Reference(Some(obj)) => match &obj.class {
+                Some(target_class) => {
+                    let target_class = Arc::clone(target_class);
+                    let (method_class, method_code) =
+                        self.lookup_virtual_method(&target_class, &name_des)?;
+                    args.insert(0, Value::Reference(Some(obj)));
 
-                let mut new_frame = Frame::new(target_class, &name_des, method_code);
-                for (i, arg) in args.into_iter().enumerate() {
-                    new_frame.set_local(i, arg);
+                    let mut new_frame = Frame::new(method_class, &name_des, method_code);
+                    let mut i = 0;
+                    for arg in args.into_iter() {
+                        new_frame.set_local(i, arg.clone());
+                        if Self::get_value_type(&arg) == "double"
+                            || Self::get_value_type(&arg) == "long"
+                        {
+                            i = i + 2;
+                        } else {
+                            i = i + 1;
+                        }
+                    }
+
+                    Ok(ExecutionResult::Invoke(new_frame))
                 }
-
-                Ok(ExecutionResult::Invoke(new_frame))
-            }
+                None => Err(JVMError::NullReference),
+            },
             Value::Reference(None) => Err(JVMError::NullReference),
             _ => Err(JVMError::TypeMismatch {
-                expected: "Reference",
-                found: "non-reference",
+                expected: "Reference".to_string(),
+                found: "non-reference".to_string(),
             }),
         }
     }
@@ -232,36 +268,49 @@ impl Frame {
         false
     }
 
-    pub async fn invokeinterface(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn invokeinterface(
+        &mut self,
+        index: u16,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let (class_name, name_des) = self.resolve_method_ref(index)?;
         let mut args = self.prepare_arguments(&name_des.des)?;
         let object_ref = self.pop()?;
         match object_ref {
-            Value::Reference(Some(obj)) => {
-                let target_class = Arc::clone(&obj.class);
-                let interface_class = vm.class_loader.load_class(&class_name).await
-                    .map_err(|e| JVMError::Other(e.to_string()))?;
-                if !self.implements_interface(&target_class, &interface_class) {
-                    return Err(JVMError::IncompatibleClass {
-                        expected: class_name,
-                        found: target_class.class_name.clone(),
-                    });
+            Value::Reference(Some(obj)) => match &obj.class {
+                Some(target_class) => {
+                    let target_class = Arc::clone(target_class);
+                    let fut = Box::pin(vm.class_loader.load_class(&class_name, vm));
+                    let interface_class = fut.await.map_err(|e| JVMError::Other(e.to_string()))?;
+                    if !self.implements_interface(&target_class, &interface_class) {
+                        return Err(JVMError::IncompatibleClass {
+                            expected: class_name,
+                            found: target_class.class_name.clone(),
+                        });
+                    }
+                    let (method_class, method_code) =
+                        self.lookup_virtual_method(&target_class, &name_des)?;
+                    args.insert(0, Value::Reference(Some(obj)));
+                    let mut new_frame = Frame::new(method_class, &name_des, method_code);
+                    let mut i = 0;
+                    for arg in args.into_iter() {
+                        new_frame.set_local(i, arg.clone());
+                        if Self::get_value_type(&arg) == "double"
+                            || Self::get_value_type(&arg) == "long"
+                        {
+                            i = i + 2;
+                        } else {
+                            i = i + 1;
+                        }
+                    }
+                    Ok(ExecutionResult::Invoke(new_frame))
                 }
-
-                let method_code = self.lookup_virtual_method(&target_class, &name_des)?;
-                args.insert(0, Value::Reference(Some(obj)));
-
-                let mut new_frame = Frame::new(target_class, &name_des, method_code);
-                for (i, arg) in args.into_iter().enumerate() {
-                    new_frame.set_local(i, arg);
-                }
-
-                Ok(ExecutionResult::Invoke(new_frame))
-            }
+                None => Err(JVMError::NullReference),
+            },
             Value::Reference(None) => Err(JVMError::NullReference),
             _ => Err(JVMError::TypeMismatch {
-                expected: "Reference",
-                found: "non-reference",
+                expected: "Reference".to_string(),
+                found: "non-reference".to_string(),
             }),
         }
     }

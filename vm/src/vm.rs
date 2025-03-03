@@ -1,11 +1,13 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
+use crate::native::NativeMethodLoader;
 
 use super::class_loader::class_loader::ClassLoader;
 use super::class_loader::loaded_class::NameDes;
 use super::heap::Heap;
 use super::jvm_error::JVMError;
 use super::runtime::*;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -13,6 +15,7 @@ pub struct VM {
     pub stack: Arc<RwLock<Stack>>,
     pub class_loader: ClassLoader,
     pub heap: Arc<RwLock<Heap>>,
+    pub native_methods: HashMap<NameDes, Arc<NativeMethodLoader>>,
 }
 
 impl VM {
@@ -21,6 +24,7 @@ impl VM {
             stack: Arc::new(RwLock::new(Stack::new())),
             class_loader: ClassLoader::new(),
             heap: Arc::new(RwLock::new(Heap::new(heap_size))),
+            native_methods: HashMap::new(),
         };
         vm.preload_classes()
             .await
@@ -28,6 +32,7 @@ impl VM {
         vm.preinitialize_classes()
             .await
             .expect("Failed to preinitialize classes");
+        vm.register_native_methods();
         vm
     }
 
@@ -66,6 +71,23 @@ impl VM {
         Ok(())
     }
 
+    fn register_native_methods(&mut self) {
+        let mut native_loader =
+            NativeMethodLoader::new("./libnative_io.so").expect("Failed to load libnative_io.so");
+
+        native_loader.load_function("Java_ioTer_prints").unwrap();
+
+        let native_loader = Arc::new(native_loader);
+
+        let printf_key = NameDes {
+            name: "prints".to_string(),
+            des: "(Ljava/lang/String;)V".to_string(),
+        };
+
+        self.native_methods
+            .insert(printf_key, Arc::clone(&native_loader));
+    }
+
     pub async fn invoke_main(&self, class_name: &str) -> Result<(), JVMError> {
         let main_class = self
             .class_loader
@@ -82,8 +104,8 @@ impl VM {
         {
             let mut stack = self.stack.write().await;
             let _ = stack.push_frame(main_frame)?;
-            let damn = stack.execute_current_frame(self).await?;
-            println!("{:?}", damn);
+            let _ = stack.execute_current_frame(self).await?;
+            //println!("{:?}", damn);
         }
         Ok(())
     }

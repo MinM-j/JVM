@@ -36,10 +36,10 @@ impl Stack {
                 }
                 ExecutionResult::Return(return_value) => {
                     if frame_index == 0 {
-                        println!("{:?}", self.frames[frame_index].locals);
+                        //println!("{:?}", self.frames[frame_index].locals);
                         return Ok(());
                     }
-                    println!("{:?}", self.frames[frame_index].locals);
+                    //println!("{:?}", self.frames[frame_index].locals);
                     self.pop_frame()?;
                     if let Some(value) = return_value {
                         self.frames[frame_index - 1].push(value)?;
@@ -74,7 +74,6 @@ impl Stack {
                             }
                         }
                     } else {
-                        println!("3");
                         return Err(JVMError::UncaughtException(exception));
                     }
                     /*

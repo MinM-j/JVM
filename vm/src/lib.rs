@@ -26,3 +26,4 @@ pub mod jvm_error;
 pub mod object;
 pub mod heap;
 pub mod garbagge_collector;
+pub mod native;

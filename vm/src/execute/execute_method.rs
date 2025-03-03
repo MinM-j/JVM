@@ -4,6 +4,7 @@ use crate::runtime::*;
 use crate::vm::VM;
 use crate::{class_loader::loaded_class::NameDes, jvm_error::JVMError};
 use parser::access_flag::ClassFlags;
+use parser::access_flag::MethodFlags;
 use parser::attribute::Code;
 use parser::constant_pool::{ConstantInfo, ConstantInterfaceMethodRefInfo, ConstantMethodRefInfo};
 use std::sync::Arc;
@@ -149,21 +150,62 @@ impl Frame {
             .await
             .map_err(|e| JVMError::Other(e.to_string()))
             .unwrap();
-        let (method_class, method_code) = self.lookup_virtual_method(&target_class, &name_des)?;
-        let args = self.prepare_arguments(&name_des.des)?;
+        let method_info = target_class
+            .methods
+            .iter()
+            .find(|method| {
+                let method_name = target_class
+                    .constant_pool
+                    .get_underlying_string_from_utf8_index(method.name_index)
+                    .unwrap();
+                let method_desc = target_class
+                    .constant_pool
+                    .get_underlying_string_from_utf8_index(method.descriptor_index)
+                    .unwrap();
+                *method_name == name_des.name && *method_desc == name_des.des
+            })
+            .ok_or_else(|| JVMError::Other(format!("Method not found: {}", name_des.name)))?;
 
-        let mut new_frame = Frame::new(method_class, &name_des, method_code);
-        let mut i = 0;
-        for arg in args.into_iter() {
-            new_frame.set_local(i, arg.clone());
-            if Self::get_value_type(&arg) == "double" || Self::get_value_type(&arg) == "long" {
-                i = i + 2;
+        if method_info.access_flags.contains(MethodFlags::ACC_NATIVE) {
+            if let Some(native_loader) = vm.native_methods.get(&name_des) {
+                let mut args = self.prepare_arguments(&name_des.des)?;
+                args.reverse();
+                let native_name =
+                    format!("Java_{}_{}", class_name.replace('/', "_"), name_des.name);
+                //println!("{native_name}");
+                let result = native_loader
+                    .invoke(&native_name, &args)
+                    .map_err(|e| JVMError::Other(format!("Native call failed: {}", e)))?;
+                if name_des.des.ends_with("V") {
+                    Ok(ExecutionResult::Continue)
+                } else {
+                    self.push(result)?;
+                    Ok(ExecutionResult::Continue)
+                }
             } else {
-                i = i + 1;
+                Err(JVMError::Other(format!(
+                    "Native method not found: {}",
+                    name_des.name
+                )))
             }
-        }
+        } else {
+            let (method_class, method_code) =
+                self.lookup_virtual_method(&target_class, &name_des)?;
+            let args = self.prepare_arguments(&name_des.des)?;
 
-        Ok(ExecutionResult::Invoke(new_frame))
+            let mut new_frame = Frame::new(method_class, &name_des, method_code);
+            let mut i = 0;
+            for arg in args.into_iter() {
+                new_frame.set_local(i, arg.clone());
+                if Self::get_value_type(&arg) == "double" || Self::get_value_type(&arg) == "long" {
+                    i = i + 2;
+                } else {
+                    i = i + 1;
+                }
+            }
+
+            Ok(ExecutionResult::Invoke(new_frame))
+        }
     }
 
     pub async fn invokespecial(

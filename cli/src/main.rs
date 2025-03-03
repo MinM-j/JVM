@@ -31,7 +31,7 @@ async fn run(class: &str) {
     let _ = vm.class_loader.add_directory_entry("".to_string());
     //let _ = vm.class_loader.add_directory_entry("../Temp/java/".to_string());
     let damn = vm.invoke_main(&main_class).await;
-    println!("{:?}",damn);
+    //println!("{:?}",damn);
 
     //dbg!(class);
 }

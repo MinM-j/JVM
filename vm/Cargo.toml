@@ -12,6 +12,7 @@ async-trait = "0.1.85"
 tokio = { version = "1.43.0", features = ["full"]}
 libloading = "0.8.6"
 libc = "0.2.170"
+libffi = "3.2.0"
 
 [build-dependencies]
 cc = "1.2.16"

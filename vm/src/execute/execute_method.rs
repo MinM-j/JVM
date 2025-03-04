@@ -167,26 +167,18 @@ impl Frame {
             .ok_or_else(|| JVMError::Other(format!("Method not found: {}", name_des.name)))?;
 
         if method_info.access_flags.contains(MethodFlags::ACC_NATIVE) {
-            if let Some(native_loader) = vm.native_methods.get(&name_des) {
-                let mut args = self.prepare_arguments(&name_des.des)?;
-                args.reverse();
-                let native_name =
-                    format!("Java_{}_{}", class_name.replace('/', "_"), name_des.name);
-                //println!("{native_name}");
-                let result = native_loader
-                    .invoke(&native_name, &args)
-                    .map_err(|e| JVMError::Other(format!("Native call failed: {}", e)))?;
-                if name_des.des.ends_with("V") {
-                    Ok(ExecutionResult::Continue)
-                } else {
-                    self.push(result)?;
-                    Ok(ExecutionResult::Continue)
-                }
+            let mut args = self.prepare_arguments(&name_des.des)?;
+            args.reverse();
+            let native_name = format!("Java_{}_{}", class_name.replace('/', "_"), name_des.name);
+            let result = vm
+                .native_stack
+                .invoke(&native_name, &class_name, &args, &name_des.des)
+                .map_err(|e| JVMError::Other(format!("Native call failed: {}", e)))?;
+            if name_des.des.ends_with("V") {
+                Ok(ExecutionResult::Continue)
             } else {
-                Err(JVMError::Other(format!(
-                    "Native method not found: {}",
-                    name_des.name
-                )))
+                self.push(result)?;
+                Ok(ExecutionResult::Continue)
             }
         } else {
             let (method_class, method_code) =

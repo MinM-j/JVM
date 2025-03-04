@@ -186,7 +186,7 @@ impl Frame {
                         return Ok(ExecutionResult::Throw(exception));
                 });
 */
-                match array.set_element(index, value) {
+                let _ = match array.set_element(index, value) {
                     Ok(()) => Ok::<ExecutionResult, JVMError>(ExecutionResult::Continue),
                     Err(_) => {
                         //let fut = Box::pin(vm.allocate_object("/java/lang/ArrayIndexOutOfBoundsException"));

@@ -103,9 +103,9 @@ impl ClassLoader {
             .lock()
             .unwrap()
             .insert(class_name.to_string(), Arc::clone(&loaded_class));
-        //LoadedClass::initialize(loaded_class.clone(), vm)
-         //   .await
-          //  .unwrap();
+        LoadedClass::initialize(loaded_class.clone(), vm)
+            .await
+            .unwrap();
         //println!("{class_name} loaded");
 
         Ok(loaded_class)

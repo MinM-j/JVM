@@ -17,6 +17,7 @@ impl Stack {
             return Err(JVMError::NoFrame);
         }
         let mut frame_index = self.frames.len() - 1;
+        //        println!("{:?}", self.frames[frame_index].method_name_des);
         while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
             let operation = self.frames[frame_index]
                 .code
@@ -426,6 +427,24 @@ impl Frame {
             //Execption
             Operation::Athrow => self.athrow(vm).await?,
 
+            //Pop Nop
+            Operation::Nop => ExecutionResult::Continue,
+            Operation::Pop => {
+                self.pop()?;
+                ExecutionResult::Continue
+            }
+            Operation::Pop2 => {
+                match self.operands.last() {
+                    Some(Value::Long(_)) | Some(Value::Double(_)) => {
+                        self.pop()?; 
+                    }
+                    _ => {
+                        self.pop()?;
+                        self.pop()?;
+                    }
+                }
+                ExecutionResult::Continue
+            }
             _ => {
                 println!("Instruction not implemented: {:?}", operation);
                 ExecutionResult::Continue

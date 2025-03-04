@@ -88,7 +88,12 @@ impl Heap {
         } else {
             Some(vm.class_loader.load_class(element_type, vm).await.unwrap())
         };
-        let obj = Object::new_array(class, length, element_type);
+        let appended_element_type = if element_type.starts_with("[") || element_type.len() == 1 {
+            element_type.to_string()
+        } else {
+            format!("L{};", element_type)
+        };
+        let obj = Object::new_array(class, length, &appended_element_type);
         let obj_ref = Arc::new(obj);
 
         match self.free_head {

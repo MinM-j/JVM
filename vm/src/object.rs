@@ -43,7 +43,7 @@ pub struct Object {
 
 impl Object {
     pub async fn new_class(class: Arc<LoadedClass>, vm: &VM) -> Self {
-        LoadedClass::initialize(class.clone(), vm).await.unwrap();
+        //LoadedClass::initialize(class.clone(), vm).await.unwrap();
         let fields = class.instance_fields
             .iter()
             .enumerate() 

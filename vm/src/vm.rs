@@ -1,13 +1,13 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::native::NativeMethodLoader;
+//use crate::native::NativeMethodLoader;
+use super::native::NativeStack;
 
 use super::class_loader::class_loader::ClassLoader;
 use super::class_loader::loaded_class::NameDes;
 use super::heap::Heap;
 use super::jvm_error::JVMError;
 use super::runtime::*;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -15,7 +15,7 @@ pub struct VM {
     pub stack: Arc<RwLock<Stack>>,
     pub class_loader: ClassLoader,
     pub heap: Arc<RwLock<Heap>>,
-    pub native_methods: HashMap<NameDes, Arc<NativeMethodLoader>>,
+    pub native_stack: NativeStack,
 }
 
 impl VM {
@@ -24,14 +24,11 @@ impl VM {
             stack: Arc::new(RwLock::new(Stack::new())),
             class_loader: ClassLoader::new(),
             heap: Arc::new(RwLock::new(Heap::new(heap_size))),
-            native_methods: HashMap::new(),
+            native_stack: NativeStack::new(),
         };
         vm.preload_classes()
             .await
             .expect("Failed to preload classes");
-        vm.preinitialize_classes()
-            .await
-            .expect("Failed to preinitialize classes");
         vm.register_native_methods();
         vm
     }
@@ -47,6 +44,7 @@ impl VM {
             "java/lang/constant/ConstantDesc",
         ];
         let _ = self.class_loader.add_jar_entry(BASE.to_string());
+        let _ = self.class_loader.add_directory_entry("./IO/".to_string());
         for class_name in classes.iter() {
             self.class_loader.load_class(class_name, self).await?;
         }
@@ -72,20 +70,37 @@ impl VM {
     }
 
     fn register_native_methods(&mut self) {
-        let mut native_loader =
-            NativeMethodLoader::new("./libnative_io.so").expect("Failed to load libnative_io.so");
-
-        native_loader.load_function("Java_ioTer_prints").unwrap();
-
-        let native_loader = Arc::new(native_loader);
-
+        self.native_stack
+            .register_library("native_io", "./IO/ioTer.so")
+            .expect("Failed to load libnative_io.so");
         let printf_key = NameDes {
-            name: "prints".to_string(),
-            des: "(Ljava/lang/String;)V".to_string(),
+            name: "printf".to_string(),
+            des: "(Ljava/lang/String;[Ljava/lang/Object;)V".to_string(),
         };
-
-        self.native_methods
-            .insert(printf_key, Arc::clone(&native_loader));
+        self.native_stack
+            .register_method(printf_key, "native_io")
+            .expect("Failed to register Java_ioTer_printf");
+        let add_key = NameDes {
+            name: "add".to_string(),
+            des: "(II)I".to_string(),
+        };
+        self.native_stack
+            .register_method(add_key, "native_io")
+            .expect("Failed to register Java_ioTer_add");
+        let prints_key = NameDes {
+                    name: "prints".to_string(),
+                    des: "(Ljava/lang/String;)V".to_string(),
+        };
+        self.native_stack
+            .register_method(prints_key, "native_io")
+            .expect("Failed to register Java_ioTer_prints");
+        let print_num_key = NameDes {
+                    name: "printn".to_string(),
+                    des: "(D)V".to_string(),
+        };
+        self.native_stack
+            .register_method(print_num_key, "native_io")
+            .expect("Failed to register Java_ioTer_prints");
     }
 
     pub async fn invoke_main(&self, class_name: &str) -> Result<(), JVMError> {

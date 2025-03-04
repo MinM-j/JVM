@@ -27,7 +27,7 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(class: Arc<LoadedClass>, name_des: &NameDes, code: Arc<Code>) -> Self {
-//        println!("{:}",class.class_name);
+      //  println!("{:}",class.class_name);
         Frame {
             constant_pool: Arc::clone(&class.constant_pool),
             method_name_des: name_des.clone(),

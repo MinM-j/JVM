@@ -5,11 +5,11 @@ public class Main {
         Dog dog = new Dog("Buddy", 3);
         Cat cat = new Cat("Whiskers", 2);
 
-		String dog_info = dog.displayInfo();
-		String dog_speak = dog.speak();
+		dog.displayInfo();
+		dog.speak();
 
-		String cat_info = cat.displayInfo();
-		String cat_speak = cat.speak();
+		cat.displayInfo();
+		cat.speak();
     }
 }
 

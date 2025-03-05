@@ -19,6 +19,10 @@ public class MultiDimensionalArrayExample {
             }
             rowSums[i] = sum;  // Store the sum of the row in the 1D array
         }
+		ioTer.prints("Sum of rows:");
+		for (int i = 0; i < rowSums.length; i++){
+			ioTer.printn(rowSums[i]);
+		}
     }
 }
 

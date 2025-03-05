@@ -42,6 +42,7 @@ impl VM {
             "java/lang/CharSequence",
             "java/lang/constant/Constable",
             "java/lang/constant/ConstantDesc",
+            "java/lang/Class"
         ];
         let _ = self.class_loader.add_jar_entry(BASE.to_string());
         let _ = self.class_loader.add_directory_entry("./IO/".to_string());

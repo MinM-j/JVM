@@ -91,6 +91,8 @@ impl Frame {
                     while chars.next() == Some('[') {}
                     if let Some('L') = chars.next() {
                         while chars.next() != Some(';') {}
+                    } else{
+                        chars.next();
                     }
                 }
                 _ => count += 1,
@@ -169,6 +171,9 @@ impl Frame {
         if method_info.access_flags.contains(MethodFlags::ACC_NATIVE) {
             let mut args = self.prepare_arguments(&name_des.des)?;
             args.reverse();
+            if class_name.starts_with("java") {
+                return Ok(ExecutionResult::Continue);
+            }
             let native_name = format!("Java_{}_{}", class_name.replace('/', "_"), name_des.name);
             let result = vm
                 .native_stack

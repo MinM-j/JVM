@@ -17,7 +17,8 @@ impl Stack {
             return Err(JVMError::NoFrame);
         }
         let mut frame_index = self.frames.len() - 1;
-        //        println!("{:?}", self.frames[frame_index].method_name_des);
+//                println!("{:?}", self.frames[frame_index].method_name_des);
+        //println!("{:?}", self.frames[frame_index].locals);
         while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
             let operation = self.frames[frame_index]
                 .code
@@ -445,12 +446,16 @@ impl Frame {
                 }
                 ExecutionResult::Continue
             }
+
+            //check cast and instance of
+            Operation::Checkcast(index1, index2) => self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
+            Operation::Instanceof(index1, index2) => self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
             _ => {
                 println!("Instruction not implemented: {:?}", operation);
                 ExecutionResult::Continue
             }
         };
-        //println!("{:?}", operation);
+ //       println!("{:?}", operation);
         Ok(return_op_type)
     }
 }

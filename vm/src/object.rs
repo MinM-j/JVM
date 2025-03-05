@@ -1,9 +1,9 @@
 use super::class_loader::loaded_class::LoadedClass;
 use super::jvm_error::JVMError;
 use super::runtime::Value;
-use std::cell::RefCell;
-use std::sync::Arc;
 use super::vm::VM;
+use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct ObjectHeader {
@@ -39,16 +39,19 @@ pub struct Object {
     pub class: Option<Arc<LoadedClass>>,
     pub header: RefCell<ObjectHeader>,
     pub kind: ObjectKind,
+    pub monitor: Arc<Mutex<()>>,
 }
 
 impl Object {
     pub async fn new_class(class: Arc<LoadedClass>, vm: &VM) -> Self {
         //LoadedClass::initialize(class.clone(), vm).await.unwrap();
-        let fields = class.instance_fields
+        let fields = class
+            .instance_fields
             .iter()
-            .enumerate() 
+            .enumerate()
             .map(|(index, _field)| {
-                let descriptor = class.instance_fields_descriptors
+                let descriptor = class
+                    .instance_fields_descriptors
                     .get(&index)
                     .expect("Field descriptor not found in instance_fields_descriptors");
                 match descriptor.as_str() {
@@ -68,14 +71,22 @@ impl Object {
         Object {
             class: Some(class),
             header: RefCell::new(ObjectHeader::new()),
-            kind: ObjectKind::ClassInstance { fields: RefCell::new(fields) },
+            kind: ObjectKind::ClassInstance {
+                fields: RefCell::new(fields),
+            },
+            monitor: Arc::new(Mutex::new(())),
         }
     }
 
     pub fn get_field(&self, name: &str) -> Result<Value, JVMError> {
         if let ObjectKind::ClassInstance { fields } = &self.kind {
-            let class = self.class.as_ref().ok_or_else(|| JVMError::Other("No class for instance".to_string()))?;
-            let index = class.instance_fields_indices.get(name)
+            let class = self
+                .class
+                .as_ref()
+                .ok_or_else(|| JVMError::Other("No class for instance".to_string()))?;
+            let index = class
+                .instance_fields_indices
+                .get(name)
                 .ok_or_else(|| JVMError::Other(format!("Instance field {} not found", name)))?;
             Ok(fields.borrow()[*index].clone())
         } else {
@@ -85,8 +96,13 @@ impl Object {
 
     pub fn set_field(&self, name: &str, value: Value) -> Result<(), JVMError> {
         if let ObjectKind::ClassInstance { fields } = &self.kind {
-            let class = self.class.as_ref().ok_or_else(|| JVMError::Other("No class for instance".to_string()))?;
-            let index = class.instance_fields_indices.get(name)
+            let class = self
+                .class
+                .as_ref()
+                .ok_or_else(|| JVMError::Other("No class for instance".to_string()))?;
+            let index = class
+                .instance_fields_indices
+                .get(name)
                 .ok_or_else(|| JVMError::Other(format!("Instance field {} not found", name)))?;
             fields.borrow_mut()[*index] = value;
             Ok(())
@@ -105,31 +121,48 @@ impl Object {
                 elements: RefCell::new(elements),
                 element_type: element_type.to_string(),
             },
+            monitor: Arc::new(Mutex::new(())),
         }
     }
 
     pub fn get_element(&self, index: usize) -> Result<Value, JVMError> {
-        if let ObjectKind::ArrayInstance { elements, length, .. } = &self.kind {
+        if let ObjectKind::ArrayInstance {
+            elements, length, ..
+        } = &self.kind
+        {
             if index < *length {
                 Ok(elements.borrow()[index].clone())
             } else {
-                Err(JVMError::IndexOutOfBounds { index, max: *length })
+                Err(JVMError::IndexOutOfBounds {
+                    index,
+                    max: *length,
+                })
             }
         } else {
-            Err(JVMError::Other("Element access on class instance".to_string()))
+            Err(JVMError::Other(
+                "Element access on class instance".to_string(),
+            ))
         }
     }
 
     pub fn set_element(&self, index: usize, value: Value) -> Result<(), JVMError> {
-        if let ObjectKind::ArrayInstance { elements, length, .. } = &self.kind {
+        if let ObjectKind::ArrayInstance {
+            elements, length, ..
+        } = &self.kind
+        {
             if index < *length {
                 elements.borrow_mut()[index] = value;
                 Ok(())
             } else {
-                Err(JVMError::IndexOutOfBounds { index, max: *length })
+                Err(JVMError::IndexOutOfBounds {
+                    index,
+                    max: *length,
+                })
             }
         } else {
-            Err(JVMError::Other("Element access on class instance".to_string()))
+            Err(JVMError::Other(
+                "Element access on class instance".to_string(),
+            ))
         }
     }
 }

@@ -103,9 +103,8 @@ impl ClassLoader {
             .lock()
             .unwrap()
             .insert(class_name.to_string(), Arc::clone(&loaded_class));
-        LoadedClass::initialize(loaded_class.clone(), vm)
-            .await
-            .unwrap();
+        let fut = Box::pin(LoadedClass::initialize(loaded_class.clone(), vm));
+        fut.await.unwrap();
         //println!("{class_name} loaded");
 
         Ok(loaded_class)

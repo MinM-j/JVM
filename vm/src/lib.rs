@@ -19,6 +19,8 @@ pub mod execute {
     pub mod execute_array;
     pub mod execute_convert;
     pub mod execute_shift;
+    pub mod execute_cast;
+    pub mod execute_monitor;
 }
 pub mod runtime;
 pub mod vm;

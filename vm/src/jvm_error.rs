@@ -57,6 +57,10 @@ pub enum JVMError {
 
     UncaughtException(String),
 
+    ClassCastException(String),
+
+    IllegalMonitorStateException(String),
+
     NoFrame,
     Other(String),
 }

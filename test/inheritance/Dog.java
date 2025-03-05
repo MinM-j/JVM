@@ -7,8 +7,8 @@ class Dog extends Animal {
 
     // Overriding the speak method
     @Override
-    public String speak() {
-        return "The dog barks";
+    public void speak() {
+        ioTer.prints("The dog barks");
     }
 }
 

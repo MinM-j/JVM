@@ -11,12 +11,14 @@ class Animal {
     }
 
     // Method to display animal information
-    public String speak() {
-        return "Animal is making a sound";
+    public void speak() {
+         ioTer.prints("Animal is making a sound");
     }
 
     // Method to display general information about the animal
-    public String displayInfo() {
-		return name;
+    public void displayInfo() {
+		ioTer.prints(name);
+		ioTer.prints("Age:");
+		ioTer.printn(age);
     }
 }

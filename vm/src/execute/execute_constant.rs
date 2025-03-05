@@ -52,10 +52,12 @@ impl Frame {
                     .constant_pool
                     .get_underlying_string_from_utf8_index(*name_index)
                     .ok_or_else(|| JVMError::Other(format!("Invalid name_index {}", name_index)))?;
-                
+                let loaded_class = vm.class_loader.load_class(class_name, vm).await.unwrap();
+                let mut heap = vm.heap.write().await;
+                let class_ref = heap.allocate_class(vm, loaded_class).await?;
                 //let loaded_class = vm.class_loader.load_class(class_name, vm).await.unwrap();
                 
-                let class_ref = vm.allocate_object(class_name).await?;
+                //let class_ref = vm.allocate_object(class_name).await?;
                 
                 self.push(class_ref)?;
             }

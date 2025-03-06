@@ -34,6 +34,7 @@ impl NativeStack {
             loader.load_function("Java_ioTer_add")?;
             loader.load_function("Java_ioTer_prints")?;
             loader.load_function("Java_ioTer_printn")?;
+            loader.load_function("Java_ioTer_printi")?;
         } else if lib_name == "math" {
             loader.load_function("Java_Math_add")?;
         }
@@ -243,6 +244,20 @@ impl NativeMethodLoader {
                     _ => return Err("Argument must be a number (int, float, double)".to_string()),
                 };
                 cif_args.push(Type::f64());
+                call_args.push(Arg::new(&number));
+            }
+            "Java_ioTer_printi" => {
+                if args.len() != 1 {
+                    return Err(format!(
+                        "Expected 1 argument for printNum, got {}",
+                        args.len()
+                    ));
+                }
+                let number = match &args[0] {
+                    Value::Int(i) => *i ,
+                    _ => return Err("Argument must be a number (int)".to_string()),
+                };
+                cif_args.push(Type::i32());
                 call_args.push(Arg::new(&number));
             }
             _ => return Err(format!("Unknown native function: {}", name)),

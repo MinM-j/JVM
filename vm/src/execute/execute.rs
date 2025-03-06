@@ -455,7 +455,6 @@ impl Frame {
                 ExecutionResult::Continue
             }
         };
- //       println!("{:?}", operation);
         Ok(return_op_type)
     }
 }

@@ -72,7 +72,7 @@ impl VM {
 
     fn register_native_methods(&mut self) {
         self.native_stack
-            .register_library("native_io", "./IO/ioTer.so")
+            .register_library("native_io", "./IO/libnative_io.so")
             .expect("Failed to load libnative_io.so");
         let printf_key = NameDes {
             name: "printf".to_string(),
@@ -101,7 +101,14 @@ impl VM {
         };
         self.native_stack
             .register_method(print_num_key, "native_io")
-            .expect("Failed to register Java_ioTer_prints");
+            .expect("Failed to register Java_ioTer_printn");
+        let print_int_key = NameDes {
+                    name: "printi".to_string(),
+                    des: "(I)V".to_string(),
+        };
+        self.native_stack
+            .register_method(print_int_key, "native_io")
+            .expect("Failed to register Java_ioTer_printi");
     }
 
     pub async fn invoke_main(&self, class_name: &str) -> Result<(), JVMError> {

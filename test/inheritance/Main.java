@@ -10,6 +10,7 @@ public class Main {
 
 		cat.displayInfo();
 		cat.speak();
+		ioTer.printi(123);
     }
 }
 

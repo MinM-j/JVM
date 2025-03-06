@@ -175,6 +175,7 @@ impl Frame {
                 return Ok(ExecutionResult::Continue);
             }
             let native_name = format!("Java_{}_{}", class_name.replace('/', "_"), name_des.name);
+            //println!("{native_name}");
             let result = vm
                 .native_stack
                 .invoke(&native_name, &class_name, &args, &name_des.des)

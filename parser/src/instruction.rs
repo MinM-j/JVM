@@ -25,10 +25,10 @@ pub enum Operation {
     Baload,
     Bastore,
     Bipush(u8),
-    Breakpoint,//remaining
+    Breakpoint, //remaining
     Caload,
     Castore,
-    Checkcast(u8, u8),//remaining
+    Checkcast(u8, u8), //remaining
     D2f,
     D2i,
     D2l,
@@ -132,12 +132,12 @@ pub enum Operation {
     Iload1,
     Iload2,
     Iload3,
-//    Impdep1,
-//    Impdep2,
+    //    Impdep1,
+    //    Impdep2,
     Imul,
     Ineg,
-    Instanceof(u8, u8),//remaining
-    Invokedynamic(u8, u8, u8, u8),//remaining
+    Instanceof(u8, u8),            //remaining
+    Invokedynamic(u8, u8, u8, u8), //remaining
     Invokeinterface(u8, u8, u8, u8),
     Invokespecial(u8, u8),
     Invokestatic(u8, u8),
@@ -213,3 +213,12 @@ pub enum Operation {
     Tableswitch(i32, i32, i32, Vec<i32>),
     Wide(u8, u8, u8),
 }
+
+/*
+wide
+Invokedynamic
+Monitorenter
+Monitorexit
+Checkcast
+Instanceof
+*/

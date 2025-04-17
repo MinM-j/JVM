@@ -1,7 +1,7 @@
 use crate::jvm_error::JVMError;
 use crate::runtime::*;
-use crate::state::{Header, MessageData, SERVER_STATE};
-use crate::vm::{VM, convert_instructions};
+use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE};
+use crate::vm::{convert_instructions, VM};
 use parser::instruction::Operation;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -55,24 +55,35 @@ impl Stack {
         while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
             let ser_locals = serialize_vec(self.frames[frame_index].locals.clone());
             let ser_operands = serialize_vec(self.frames[frame_index].operands.clone());
-            let json_frame = MessageData {
-                header: Header::DATA,
-                json: json!({"header": "frame", "name": self.frames[frame_index].method_name_des.name, "pc": self.frames[frame_index].pc, "locals": ser_locals, "operands": ser_operands}).to_string(),
-            };
             {
-                let mut queue = SERVER_STATE.lock().unwrap();
-                queue.push_back(json_frame);
+                let flag = GLOBAL_BOOL.lock().unwrap();
+                if *flag {
+                    let json_frame = MessageData {
+                        header: Header::DATA,
+                        json: json!({"header": "frame", "name": self.frames[frame_index].method_name_des.name, "pc": self.frames[frame_index].pc, "locals": ser_locals, "operands": ser_operands}).to_string(),
+                    };
+                    {
+                        let mut queue = SERVER_STATE.lock().unwrap();
+                        queue.push_back(json_frame);
+                    }
+                }
             }
             let operation = self.frames[frame_index]
                 .code
                 .get_operation_at_index(self.frames[frame_index].pc);
-            let json_cei = MessageData {
-                header: Header::DATA,
-                json: json!({"header": "cei", "value": format!("{:?}", operation)}).to_string(),
-            };
             {
-                let mut queue = SERVER_STATE.lock().unwrap();
-                queue.push_back(json_cei);
+                let flag = GLOBAL_BOOL.lock().unwrap();
+                if *flag {
+                    let json_cei = MessageData {
+                        header: Header::DATA,
+                        json: json!({"header": "cei", "value": format!("{:?}", operation)})
+                            .to_string(),
+                    };
+                    {
+                        let mut queue = SERVER_STATE.lock().unwrap();
+                        queue.push_back(json_cei);
+                    }
+                }
             }
             let stack_snapshot = self.clone();
             match self.frames[frame_index]
@@ -83,14 +94,19 @@ impl Stack {
                     self.frames[frame_index].pc += 1;
                 }
                 ExecutionResult::Invoke(new_frame) => {
-                    let code = convert_instructions(new_frame.code.code.clone());
-                    let stack_json = MessageData {
+                    {
+                        let flag = GLOBAL_BOOL.lock().unwrap();
+                        if *flag {
+                            let code = convert_instructions(new_frame.code.code.clone());
+                            let stack_json = MessageData {
                         header: Header::DATA,
                         json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len(), "code": format!("{:?}", code)}).to_string(),
                     };
-                    {
-                        let mut queue = SERVER_STATE.lock().unwrap();
-                        queue.push_back(stack_json);
+                            {
+                                let mut queue = SERVER_STATE.lock().unwrap();
+                                queue.push_back(stack_json);
+                            }
+                        }
                     }
                     self.push_frame(new_frame)?;
                     let fut = Box::pin(self.execute_current_frame(vm));
@@ -99,31 +115,41 @@ impl Stack {
                 }
                 ExecutionResult::Return(return_value) => {
                     if frame_index == 0 {
-                        let stack_json = MessageData {
-                            header: Header::DATA,
-                            json: json!({"header": "stack", "action": "pop"}).to_string(),
-                        };
                         {
-                            let mut queue = SERVER_STATE.lock().unwrap();
-                            queue.push_back(stack_json);
-                        }
-                        let eof = MessageData {
-                            header: Header::EOF,
-                            json: String::new(),
-                        };
-                        {
-                            let mut queue = SERVER_STATE.lock().unwrap();
-                            queue.push_back(eof);
+                            let flag = GLOBAL_BOOL.lock().unwrap();
+                            if *flag {
+                                let stack_json = MessageData {
+                                    header: Header::DATA,
+                                    json: json!({"header": "stack", "action": "pop"}).to_string(),
+                                };
+                                {
+                                    let mut queue = SERVER_STATE.lock().unwrap();
+                                    queue.push_back(stack_json);
+                                }
+                                let eof = MessageData {
+                                    header: Header::EOF,
+                                    json: String::new(),
+                                };
+                                {
+                                    let mut queue = SERVER_STATE.lock().unwrap();
+                                    queue.push_back(eof);
+                                }
+                            }
                         }
                         return Ok(());
                     }
-                    let stack_json = MessageData {
-                        header: Header::DATA,
-                        json: json!({"header": "stack", "action": "pop"}).to_string(),
-                    };
                     {
-                        let mut queue = SERVER_STATE.lock().unwrap();
-                        queue.push_back(stack_json);
+                        let flag = GLOBAL_BOOL.lock().unwrap();
+                        if *flag {
+                            let stack_json = MessageData {
+                                header: Header::DATA,
+                                json: json!({"header": "stack", "action": "pop"}).to_string(),
+                            };
+                            {
+                                let mut queue = SERVER_STATE.lock().unwrap();
+                                queue.push_back(stack_json);
+                            }
+                        }
                     }
                     //println!("{:?}", self.frames[frame_index].locals);
                     self.pop_frame()?;
@@ -546,7 +572,7 @@ impl Frame {
                 ExecutionResult::Continue
             }
         };
-        println!("{:?}", operation);
+        //println!("{:?}", operation);
         Ok(return_op_type)
     }
 }

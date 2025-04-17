@@ -41,7 +41,8 @@ async fn vis(class: &str) {
     let _ = tokio::try_join!(producer, consumer);
 */
         let _ = vm.invoke_main(&class_name).await;
-        vis::consumer_thread().await;
+        //vis::consumer_thread().await;
+        vis::file_writer().await;
 }
 
 async fn run(class: &str) {

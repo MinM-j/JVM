@@ -19,7 +19,7 @@ pub struct ObjectHeader {
 impl ObjectHeader {
     pub fn new() -> Self {
         let id = OBJECT_ID.fetch_add(1, Ordering::Relaxed);
-        println!("{id}");
+        //println!("{id}");
         ObjectHeader {
             mark: false,
             generation: 0,

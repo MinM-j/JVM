@@ -16,3 +16,5 @@ pub struct MessageData {
 
 pub static SERVER_STATE: Lazy<Arc<Mutex<VecDeque<MessageData>>>> =
     Lazy::new(|| Arc::new(Mutex::new(VecDeque::new())));
+
+pub static GLOBAL_BOOL: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::new(false)));

@@ -3,7 +3,7 @@ use super::object::Object;
 use super::runtime::*;
 use super::vm::VM;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::state::{Header, MessageData, SERVER_STATE};
+use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -301,14 +301,19 @@ impl Heap {
     }
 
     pub fn memory_json(&mut self) {
-        let (young, old) = self.collect_objects_by_generation();
-        let memory_json = MessageData {
-            header: Header::DATA,
-            json: json!({"header": "memory", "young": young, "old": old}).to_string(),
-        };
         {
-            let mut queue = SERVER_STATE.lock().unwrap();
-            queue.push_back(memory_json);
+            let flag = GLOBAL_BOOL.lock().unwrap();
+            if *flag {
+                let (young, old) = self.collect_objects_by_generation();
+                let memory_json = MessageData {
+                    header: Header::DATA,
+                    json: json!({"header": "memory", "young": young, "old": old}).to_string(),
+                };
+                {
+                    let mut queue = SERVER_STATE.lock().unwrap();
+                    queue.push_back(memory_json);
+                }
+            }
         }
     }
 

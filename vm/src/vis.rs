@@ -1,5 +1,7 @@
 use crate::state::{Header, SERVER_STATE};
 use futures_util::{SinkExt, StreamExt};
+use tokio::fs::{self, OpenOptions};
+use tokio::io::AsyncWriteExt;
 use tokio::time::{self, Duration};
 use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
 
@@ -44,4 +46,43 @@ pub async fn consumer_thread() {
         }
         println!("WebSocket connection closed.");
     }
+}
+
+pub async fn file_writer() {
+    let file_path = "visualize/dump.json";
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(file_path)
+        .await
+        .unwrap();
+    loop {
+        let data_to_write = {
+            let mut queue = SERVER_STATE.lock().unwrap();
+            queue.pop_front()
+        };
+
+        match data_to_write {
+            Some(msg) => match msg.header {
+                Header::DATA => {
+                    file.write_all(msg.json.as_bytes()).await.unwrap();
+                    file.write_all(b"\n").await.unwrap();
+
+                    //println!("Written data: {}", msg.json);
+                }
+                Header::EOF => {
+                    file.write_all(b"EOF\n").await.unwrap();
+                    //println!("EOF received, writing EOF marker to file.");
+                    break;
+                }
+            },
+            None => {
+                println!("Queue is empty, waiting for data...");
+            }
+        }
+    }
+
+    println!("File writer finished.");
 }

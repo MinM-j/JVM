@@ -5,3 +5,5 @@ test/*.class
 test/*/*.class
 
 IO/*.class
+
+visualize/*

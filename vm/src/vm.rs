@@ -1,6 +1,6 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::state::{Header, MessageData, SERVER_STATE};
+use crate::state::{Header, MessageData, SERVER_STATE, GLOBAL_BOOL};
 use serde_json::json;
 //use crate::native::NativeMethodLoader;
 use super::native::NativeStack;
@@ -145,6 +145,8 @@ impl VM {
             {
                 let mut queue = SERVER_STATE.lock().unwrap();
                 queue.push_back(stack_json);
+                let mut value = GLOBAL_BOOL.lock().unwrap();
+                *value = true;
             }
             let _ = stack.push_frame(main_frame)?;
             let _ = stack.execute_current_frame(self).await?;

@@ -1,7 +1,10 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
+use crate::state::{Header, MessageData, SERVER_STATE};
+use serde_json::json;
 //use crate::native::NativeMethodLoader;
 use super::native::NativeStack;
+use parser::instruction::*;
 
 use super::class_loader::class_loader::ClassLoader;
 use super::class_loader::loaded_class::NameDes;
@@ -20,6 +23,14 @@ pub struct VM {
 
 impl VM {
     pub async fn new(heap_size: usize) -> Self {
+        let init_json = MessageData {
+                header: Header::DATA,
+                json: json!({"header": "init", "memory size": heap_size}).to_string(),
+            };
+        {
+            let mut queue = SERVER_STATE.lock().unwrap();
+            queue.push_back(init_json);
+        }
         let mut vm = VM {
             stack: Arc::new(RwLock::new(Stack::new())),
             class_loader: ClassLoader::new(),
@@ -126,6 +137,15 @@ impl VM {
         let main_frame = Frame::new(main_class, &main_name_des, main_code);
         {
             let mut stack = self.stack.write().await;
+            let code = convert_instructions(main_frame.code.code.clone());
+            let stack_json = MessageData {
+                header: Header::DATA,
+                json: json!({"header": "stack", "name": main_frame.method_name_des.name, "action": "push", "locals": main_frame.locals.len(), "operands": main_frame.operands.len(), "code": format!("{:?}", code)}).to_string(),
+            };
+            {
+                let mut queue = SERVER_STATE.lock().unwrap();
+                queue.push_back(stack_json);
+            }
             let _ = stack.push_frame(main_frame)?;
             let _ = stack.execute_current_frame(self).await?;
             //println!("{:?}", damn);
@@ -151,6 +171,13 @@ impl VM {
         let mut heap = self.heap.write().await;
         heap.allocate_array(stack, self, element_type, length).await
     }
+}
+
+pub fn convert_instructions(instructions: Vec<Instruction>) -> Vec<Operation> {
+    instructions
+        .into_iter()
+        .map(|instruction| instruction.1)
+        .collect()
 }
 
 const BASE: &str = "/usr/lib/jvm/java-23-openjdk/jmods/java.base.jmod";

@@ -9,7 +9,6 @@ use std::sync::Arc;
 
 impl Heap {
     pub async fn run_minor_gc(&mut self, stack: &Stack,vm: &VM) -> Result<(), JVMError> {
-        println!("Minorgc");
         self.mark_from_roots(&stack);
 
         let mut new_free_head = None;

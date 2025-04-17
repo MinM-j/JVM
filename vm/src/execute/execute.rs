@@ -1,7 +1,7 @@
 use crate::jvm_error::JVMError;
 use crate::runtime::*;
 use crate::state::{Header, MessageData, SERVER_STATE};
-use crate::vm::VM;
+use crate::vm::{VM, convert_instructions};
 use parser::instruction::Operation;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -83,9 +83,10 @@ impl Stack {
                     self.frames[frame_index].pc += 1;
                 }
                 ExecutionResult::Invoke(new_frame) => {
+                    let code = convert_instructions(new_frame.code.code.clone());
                     let stack_json = MessageData {
                         header: Header::DATA,
-                        json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len()}).to_string(),
+                        json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len(), "code": format!("{:?}", code)}).to_string(),
                     };
                     {
                         let mut queue = SERVER_STATE.lock().unwrap();
@@ -98,8 +99,31 @@ impl Stack {
                 }
                 ExecutionResult::Return(return_value) => {
                     if frame_index == 0 {
-                        //println!("{:?}", self.frames[frame_index].locals);
+                        let stack_json = MessageData {
+                            header: Header::DATA,
+                            json: json!({"header": "stack", "action": "pop"}).to_string(),
+                        };
+                        {
+                            let mut queue = SERVER_STATE.lock().unwrap();
+                            queue.push_back(stack_json);
+                        }
+                        let eof = MessageData {
+                            header: Header::EOF,
+                            json: String::new(),
+                        };
+                        {
+                            let mut queue = SERVER_STATE.lock().unwrap();
+                            queue.push_back(eof);
+                        }
                         return Ok(());
+                    }
+                    let stack_json = MessageData {
+                        header: Header::DATA,
+                        json: json!({"header": "stack", "action": "pop"}).to_string(),
+                    };
+                    {
+                        let mut queue = SERVER_STATE.lock().unwrap();
+                        queue.push_back(stack_json);
                     }
                     //println!("{:?}", self.frames[frame_index].locals);
                     self.pop_frame()?;

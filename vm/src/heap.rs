@@ -3,6 +3,8 @@ use super::object::Object;
 use super::runtime::*;
 use super::vm::VM;
 use crate::class_loader::loaded_class::LoadedClass;
+use crate::state::{Header, MessageData, SERVER_STATE};
+use serde_json::json;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -41,7 +43,12 @@ impl Heap {
         }
     }
 
-    pub async fn allocate_object(&mut self, stack: &Stack,vm: &VM, class_name: &str) -> Result<Value, JVMError> {
+    pub async fn allocate_object(
+        &mut self,
+        stack: &Stack,
+        vm: &VM,
+        class_name: &str,
+    ) -> Result<Value, JVMError> {
         let class = vm.class_loader.load_class(class_name, vm).await.unwrap();
         //dbg!(&class);
         let obj = Object::new_class(Arc::clone(&class), vm).await;
@@ -51,6 +58,7 @@ impl Heap {
             Some(index) => {
                 self.young_count += 1;
                 self.take_slot(index, Arc::clone(&obj_ref));
+                self.memory_json();
                 Ok(Value::Reference(Some(obj_ref)))
             }
             None => {
@@ -59,6 +67,7 @@ impl Heap {
                     Some(index) => {
                         self.young_count += 1;
                         self.take_slot(index, Arc::clone(&obj_ref));
+                        self.memory_json();
                         Ok(Value::Reference(Some(obj_ref)))
                     }
                     None => {
@@ -67,6 +76,7 @@ impl Heap {
                             Some(index) => {
                                 self.young_count += 1;
                                 self.take_slot(index, Arc::clone(&obj_ref));
+                                self.memory_json();
                                 Ok(Value::Reference(Some(obj_ref)))
                             }
                             None => Err(JVMError::Other("Heap exhausted after GC".to_string())),
@@ -101,6 +111,7 @@ impl Heap {
             Some(index) => {
                 self.young_count += 1;
                 self.take_slot(index, Arc::clone(&obj_ref));
+                self.memory_json();
                 Ok(Value::Reference(Some(obj_ref)))
             }
             None => {
@@ -109,6 +120,7 @@ impl Heap {
                     Some(index) => {
                         self.young_count += 1;
                         self.take_slot(index, Arc::clone(&obj_ref));
+                        self.memory_json();
                         Ok(Value::Reference(Some(obj_ref)))
                     }
                     None => {
@@ -117,6 +129,7 @@ impl Heap {
                             Some(index) => {
                                 self.young_count += 1;
                                 self.take_slot(index, Arc::clone(&obj_ref));
+                                self.memory_json();
                                 Ok(Value::Reference(Some(obj_ref)))
                             }
                             None => Err(JVMError::Other("Heap exhausted after GC".to_string())),
@@ -151,7 +164,7 @@ impl Heap {
                 index
             }
             None => {
-                self.run_minor_gc(stack,vm).await?;
+                self.run_minor_gc(stack, vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -181,6 +194,7 @@ impl Heap {
             Some(index) => {
                 self.young_count += 1;
                 self.take_slot(index, Arc::clone(&string_ref));
+                self.memory_json();
                 Ok(Value::Reference(Some(string_ref)))
             }
             None => {
@@ -189,6 +203,7 @@ impl Heap {
                     Some(index) => {
                         self.young_count += 1;
                         self.take_slot(index, Arc::clone(&string_ref));
+                        self.memory_json();
                         Ok(Value::Reference(Some(string_ref)))
                     }
                     None => {
@@ -197,6 +212,7 @@ impl Heap {
                             Some(index) => {
                                 self.young_count += 1;
                                 self.take_slot(index, Arc::clone(&string_ref));
+                                self.memory_json();
                                 Ok(Value::Reference(Some(string_ref)))
                             }
                             None => Err(JVMError::Other("Heap exhausted after GC".to_string())),
@@ -219,7 +235,9 @@ impl Heap {
             .await
             .unwrap();
 
-        let name_value = self.allocate_string(stack, vm, &loaded_class.class_name).await?;
+        let name_value = self
+            .allocate_string(stack, vm, &loaded_class.class_name)
+            .await?;
 
         let class_obj = Object::new_class(class_class, vm).await;
         let class_ref = Arc::new(class_obj);
@@ -280,5 +298,43 @@ impl Heap {
         } else {
             unreachable!("Slot should be free");
         }
+    }
+
+    pub fn memory_json(&mut self) {
+        let (young, old) = self.collect_objects_by_generation();
+        let memory_json = MessageData {
+            header: Header::DATA,
+            json: json!({"header": "memory", "young": young, "old": old}).to_string(),
+        };
+        {
+            let mut queue = SERVER_STATE.lock().unwrap();
+            queue.push_back(memory_json);
+        }
+    }
+
+    fn collect_objects_by_generation(&self) -> (Vec<(String, String)>, Vec<(String, String)>) {
+        let mut gen0 = Vec::new();
+        let mut gen1 = Vec::new();
+
+        for slot in &self.objects {
+            if let Slot::Occupied(obj_arc) = slot {
+                let object = obj_arc.clone();
+                let header = object.header.borrow();
+                let object_id = header.object_id.to_string();
+                let generation = header.generation;
+
+                let class_name = match &object.class {
+                    Some(cls) => cls.class_name.clone(),
+                    None => "array".to_string(),
+                };
+
+                match generation {
+                    0 => gen0.push((object_id, class_name)),
+                    1 => gen1.push((object_id, class_name)),
+                    _ => {}
+                }
+            }
+        }
+        (gen0, gen1)
     }
 }

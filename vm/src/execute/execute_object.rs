@@ -5,7 +5,7 @@ use parser::constant_pool::{ConstantInfo, ConstantClassInfo};
 use crate::vm::VM;
 
 impl Frame {
-    pub async fn execute_new(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn execute_new(&mut self, index: u16, stack: &Stack, vm: &VM) -> Result<ExecutionResult, JVMError> {
         let cp_entry = self.constant_pool.get_entry(index).ok_or_else(|| {
             JVMError::ConstantPoolIndexOutOfBounds {
                 index,
@@ -27,7 +27,7 @@ impl Frame {
         };
         //println!("{class_name}");
 
-        let fut = Box::pin(vm.allocate_object(class_name));
+        let fut = Box::pin(vm.allocate_object(stack, class_name));
         let obj_ref = fut.await?;
         self.push(obj_ref)?;
         Ok(ExecutionResult::Continue)

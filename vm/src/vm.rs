@@ -42,7 +42,7 @@ impl VM {
             "java/lang/CharSequence",
             "java/lang/constant/Constable",
             "java/lang/constant/ConstantDesc",
-            "java/lang/Class"
+            "java/lang/Class",
         ];
         let _ = self.class_loader.add_jar_entry(BASE.to_string());
         let _ = self.class_loader.add_directory_entry("./IO/".to_string());
@@ -89,22 +89,22 @@ impl VM {
             .register_method(add_key, "native_io")
             .expect("Failed to register Java_ioTer_add");
         let prints_key = NameDes {
-                    name: "prints".to_string(),
-                    des: "(Ljava/lang/String;)V".to_string(),
+            name: "prints".to_string(),
+            des: "(Ljava/lang/String;)V".to_string(),
         };
         self.native_stack
             .register_method(prints_key, "native_io")
             .expect("Failed to register Java_ioTer_prints");
         let print_num_key = NameDes {
-                    name: "printn".to_string(),
-                    des: "(D)V".to_string(),
+            name: "printn".to_string(),
+            des: "(D)V".to_string(),
         };
         self.native_stack
             .register_method(print_num_key, "native_io")
             .expect("Failed to register Java_ioTer_printn");
         let print_int_key = NameDes {
-                    name: "printi".to_string(),
-                    des: "(I)V".to_string(),
+            name: "printi".to_string(),
+            des: "(I)V".to_string(),
         };
         self.native_stack
             .register_method(print_int_key, "native_io")
@@ -133,18 +133,23 @@ impl VM {
         Ok(())
     }
 
-    pub async fn allocate_object(&self, class_name: &str) -> Result<Value, JVMError> {
+    pub async fn allocate_object(
+        &self,
+        stack: &Stack,
+        class_name: &str,
+    ) -> Result<Value, JVMError> {
         let mut heap = self.heap.write().await;
-        heap.allocate_object(self, class_name).await
+        heap.allocate_object(stack, self, class_name).await
     }
 
     pub async fn allocate_array(
         &self,
+        stack: &Stack,
         element_type: &str,
         length: usize,
     ) -> Result<Value, JVMError> {
         let mut heap = self.heap.write().await;
-        heap.allocate_array(self, element_type, length).await
+        heap.allocate_array(stack, self, element_type, length).await
     }
 }
 

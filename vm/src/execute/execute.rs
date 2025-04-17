@@ -1,7 +1,10 @@
 use crate::jvm_error::JVMError;
 use crate::runtime::*;
+use crate::state::{Header, MessageData, SERVER_STATE};
 use crate::vm::VM;
 use parser::instruction::Operation;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug)]
 pub enum ExecutionResult {
@@ -11,26 +14,83 @@ pub enum ExecutionResult {
     Throw(String),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SerValue {
+    Default,
+    Int(i32),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    Reference(String),
+}
+
+pub fn serialize_vec(values: Vec<Value>) -> Vec<SerValue> {
+    values
+        .into_iter()
+        .map(|v| match v {
+            Value::Default => SerValue::Default,
+            Value::Int(i) => SerValue::Int(i),
+            Value::Long(l) => SerValue::Long(l),
+            Value::Float(f) => SerValue::Float(f),
+            Value::Double(d) => SerValue::Double(d),
+            Value::Reference(ref opt_obj) => match opt_obj {
+                Some(obj) => {
+                    let object_id = obj.header.borrow().object_id;
+                    SerValue::Reference(format!("Object Id: {}", object_id))
+                }
+                None => SerValue::Reference("None".to_string()),
+            },
+        })
+        .collect()
+}
+
 impl Stack {
     pub async fn execute_current_frame(&mut self, vm: &VM) -> Result<(), JVMError> {
         if self.frames.is_empty() {
             return Err(JVMError::NoFrame);
         }
         let mut frame_index = self.frames.len() - 1;
-//                println!("{:?}", self.frames[frame_index].method_name_des);
+        //                println!("{:?}", self.frames[frame_index].method_name_des);
         //println!("{:?}", self.frames[frame_index].locals);
         while self.frames[frame_index].pc < self.frames[frame_index].code.code.len() {
+            let ser_locals = serialize_vec(self.frames[frame_index].locals.clone());
+            let ser_operands = serialize_vec(self.frames[frame_index].operands.clone());
+            let json_frame = MessageData {
+                header: Header::DATA,
+                json: json!({"header": "frame", "name": self.frames[frame_index].method_name_des.name, "pc": self.frames[frame_index].pc, "locals": ser_locals, "operands": ser_operands}).to_string(),
+            };
+            {
+                let mut queue = SERVER_STATE.lock().unwrap();
+                queue.push_back(json_frame);
+            }
             let operation = self.frames[frame_index]
                 .code
                 .get_operation_at_index(self.frames[frame_index].pc);
+            let json_cei = MessageData {
+                header: Header::DATA,
+                json: json!({"header": "cei", "value": format!("{:?}", operation)}).to_string(),
+            };
+            {
+                let mut queue = SERVER_STATE.lock().unwrap();
+                queue.push_back(json_cei);
+            }
+            let stack_snapshot = self.clone();
             match self.frames[frame_index]
-                .execute_instruction(&operation, vm)
+                .execute_instruction(&operation, &stack_snapshot, vm)
                 .await?
             {
                 ExecutionResult::Continue => {
                     self.frames[frame_index].pc += 1;
                 }
                 ExecutionResult::Invoke(new_frame) => {
+                    let stack_json = MessageData {
+                        header: Header::DATA,
+                        json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len()}).to_string(),
+                    };
+                    {
+                        let mut queue = SERVER_STATE.lock().unwrap();
+                        queue.push_back(stack_json);
+                    }
                     self.push_frame(new_frame)?;
                     let fut = Box::pin(self.execute_current_frame(vm));
                     fut.await?;
@@ -118,6 +178,7 @@ impl Frame {
     pub async fn execute_instruction(
         &mut self,
         operation: &Operation,
+        stack: &Stack,
         vm: &VM,
     ) -> Result<ExecutionResult, JVMError> {
         let return_op_type = match operation {
@@ -195,13 +256,13 @@ impl Frame {
             Operation::Sipush(index1, index2) => {
                 self.sipush(((*index1 as i16) << 8) | *index2 as i16)?
             }
-            Operation::Ldc(index) => self.ldc(*index, vm).await?,
+            Operation::Ldc(index) => self.ldc(*index, stack, vm).await?,
             Operation::Ldcw(index1, index2) => {
-                self.ldc_w(((*index1 as u16) << 8) | *index2 as u16, vm)
+                self.ldc_w(((*index1 as u16) << 8) | *index2 as u16, stack, vm)
                     .await?
             }
             Operation::Ldc2w(index1, index2) => {
-                self.ldc2_w(((*index1 as u16) << 8) | *index2 as u16)?
+                self.ldc2_w(stack, ((*index1 as u16) << 8) | *index2 as u16)?
             }
 
             //Shifting and bit-wise operations
@@ -339,9 +400,9 @@ impl Frame {
             Operation::Areturn => self.return_reference()?,
 
             //array instructions
-            Operation::Newarray(atype) => self.newarray(*atype, vm).await?,
+            Operation::Newarray(atype) => self.newarray(*atype, stack, vm).await?,
             Operation::Anewarray(index1, index2) => {
-                self.anewarray(((*index1 as u16) << 8) | *index2 as u16, vm)
+                self.anewarray(((*index1 as u16) << 8) | *index2 as u16, stack, vm)
                     .await?
             }
             Operation::Iaload => self.array_load("I".to_string(), vm).await?,
@@ -364,7 +425,7 @@ impl Frame {
 
             //objects instructions
             Operation::New(index1, index2) => {
-                self.execute_new(((*index1 as u16) << 8) | *index2 as u16, vm)
+                self.execute_new(((*index1 as u16) << 8) | *index2 as u16, stack, vm)
                     .await?
             }
             Operation::Dup => self.dup()?,
@@ -437,7 +498,7 @@ impl Frame {
             Operation::Pop2 => {
                 match self.operands.last() {
                     Some(Value::Long(_)) | Some(Value::Double(_)) => {
-                        self.pop()?; 
+                        self.pop()?;
                     }
                     _ => {
                         self.pop()?;
@@ -448,13 +509,20 @@ impl Frame {
             }
 
             //check cast and instance of
-            Operation::Checkcast(index1, index2) => self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
-            Operation::Instanceof(index1, index2) => self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm).await?,
+            Operation::Checkcast(index1, index2) => {
+                self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
+            Operation::Instanceof(index1, index2) => {
+                self.checkcast(((*index1 as u16) << 8) | *index2 as u16, vm)
+                    .await?
+            }
             _ => {
                 println!("Instruction not implemented: {:?}", operation);
                 ExecutionResult::Continue
             }
         };
+        println!("{:?}", operation);
         Ok(return_op_type)
     }
 }

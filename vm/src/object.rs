@@ -3,21 +3,28 @@ use super::jvm_error::JVMError;
 use super::runtime::Value;
 use super::vm::VM;
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
+
+static OBJECT_ID: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Debug)]
 pub struct ObjectHeader {
     pub mark: bool,
     pub generation: u8,
     pub ref_count: u32,
+    pub object_id: u32,
 }
 
 impl ObjectHeader {
     pub fn new() -> Self {
+        let id = OBJECT_ID.fetch_add(1, Ordering::Relaxed);
+        println!("{id}");
         ObjectHeader {
             mark: false,
             generation: 0,
             ref_count: 1,
+            object_id: id,
         }
     }
 }

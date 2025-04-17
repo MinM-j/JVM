@@ -6,7 +6,7 @@ use crate::vm::VM;
 use parser::constant_pool::{ConstantClassInfo, ConstantInfo};
 
 impl Frame {
-    pub async fn newarray(&mut self, atype: u8, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn newarray(&mut self, atype: u8, stack:&Stack,vm: &VM) -> Result<ExecutionResult, JVMError> {
         let length = self.pop_expect_int()?;
         let element_type = match atype {
             4 => "Z",
@@ -19,13 +19,13 @@ impl Frame {
             11 => "J",
             _ => return Err(JVMError::Other(format!("Invalid array type: {}", atype))),
         };
-        let fut = Box::pin(vm.allocate_array(element_type, length as usize));
+        let fut = Box::pin(vm.allocate_array(stack, element_type, length as usize));
         let array_ref = fut.await?;
         self.push(array_ref)?;
         Ok(ExecutionResult::Continue)
     }
 
-    pub async fn anewarray(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn anewarray(&mut self, index: u16, stack:&Stack,vm: &VM) -> Result<ExecutionResult, JVMError> {
         let length = self.pop_expect_int()? as usize;
         let cp_entry = self.constant_pool.get_entry(index).ok_or_else(|| {
             JVMError::ConstantPoolIndexOutOfBounds {
@@ -45,7 +45,7 @@ impl Frame {
                 })
             }
         };
-        let fut = Box::pin(vm.allocate_array(&element_type, length));
+        let fut = Box::pin(vm.allocate_array(stack, &element_type, length));
         let array_ref = fut.await?;
         self.push(array_ref)?;
         Ok(ExecutionResult::Continue)

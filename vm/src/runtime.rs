@@ -15,7 +15,7 @@ pub enum Value {
     Reference(Option<Arc<Object>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub constant_pool: Arc<ConstantPool>,
     pub method_name_des: NameDes,
@@ -61,7 +61,7 @@ impl Frame {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Stack {
     pub frames: Vec<Frame>,
     pub max_stack_size: usize,
@@ -85,6 +85,9 @@ impl Stack {
 
     pub fn pop_frame(&mut self) -> Result<Frame, JVMError> {
         self.frames.pop().ok_or(JVMError::StackUnderflow)
+    }
+        pub fn clone_data(&self) -> Self {
+        self.clone()
     }
 }
 

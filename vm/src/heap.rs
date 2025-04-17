@@ -1,6 +1,6 @@
 use super::jvm_error::JVMError;
 use super::object::Object;
-use super::runtime::Value;
+use super::runtime::*;
 use super::vm::VM;
 use crate::class_loader::loaded_class::LoadedClass;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl Heap {
         }
     }
 
-    pub async fn allocate_object(&mut self, vm: &VM, class_name: &str) -> Result<Value, JVMError> {
+    pub async fn allocate_object(&mut self, stack: &Stack,vm: &VM, class_name: &str) -> Result<Value, JVMError> {
         let class = vm.class_loader.load_class(class_name, vm).await.unwrap();
         //dbg!(&class);
         let obj = Object::new_class(Arc::clone(&class), vm).await;
@@ -54,7 +54,7 @@ impl Heap {
                 Ok(Value::Reference(Some(obj_ref)))
             }
             None => {
-                self.run_minor_gc(vm).await?;
+                self.run_minor_gc(stack, vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -62,7 +62,7 @@ impl Heap {
                         Ok(Value::Reference(Some(obj_ref)))
                     }
                     None => {
-                        self.run_major_gc(vm).await?;
+                        self.run_major_gc(stack, vm).await?;
                         match self.free_head {
                             Some(index) => {
                                 self.young_count += 1;
@@ -79,6 +79,7 @@ impl Heap {
 
     pub async fn allocate_array(
         &mut self,
+        stack: &Stack,
         vm: &VM,
         element_type: &str,
         length: usize,
@@ -103,7 +104,7 @@ impl Heap {
                 Ok(Value::Reference(Some(obj_ref)))
             }
             None => {
-                self.run_minor_gc(vm).await?;
+                self.run_minor_gc(stack, vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -111,7 +112,7 @@ impl Heap {
                         Ok(Value::Reference(Some(obj_ref)))
                     }
                     None => {
-                        self.run_major_gc(vm).await?;
+                        self.run_major_gc(stack, vm).await?;
                         match self.free_head {
                             Some(index) => {
                                 self.young_count += 1;
@@ -128,6 +129,7 @@ impl Heap {
 
     pub async fn allocate_string(
         &mut self,
+        stack: &Stack,
         vm: &VM,
         string_value: &str,
     ) -> Result<Value, JVMError> {
@@ -149,7 +151,7 @@ impl Heap {
                 index
             }
             None => {
-                self.run_minor_gc(vm).await?;
+                self.run_minor_gc(stack,vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -157,7 +159,7 @@ impl Heap {
                         index
                     }
                     None => {
-                        self.run_major_gc(vm).await?;
+                        self.run_major_gc(stack, vm).await?;
                         match self.free_head {
                             Some(index) => {
                                 self.young_count += 1;
@@ -182,7 +184,7 @@ impl Heap {
                 Ok(Value::Reference(Some(string_ref)))
             }
             None => {
-                self.run_minor_gc(vm).await?;
+                self.run_minor_gc(stack, vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -190,7 +192,7 @@ impl Heap {
                         Ok(Value::Reference(Some(string_ref)))
                     }
                     None => {
-                        self.run_major_gc(vm).await?;
+                        self.run_major_gc(stack, vm).await?;
                         match self.free_head {
                             Some(index) => {
                                 self.young_count += 1;
@@ -207,6 +209,7 @@ impl Heap {
 
     pub async fn allocate_class(
         &mut self,
+        stack: &Stack,
         vm: &VM,
         loaded_class: Arc<LoadedClass>,
     ) -> Result<Value, JVMError> {
@@ -216,7 +219,7 @@ impl Heap {
             .await
             .unwrap();
 
-        let name_value = self.allocate_string(vm, &loaded_class.class_name).await?;
+        let name_value = self.allocate_string(stack, vm, &loaded_class.class_name).await?;
 
         let class_obj = Object::new_class(class_class, vm).await;
         let class_ref = Arc::new(class_obj);
@@ -230,7 +233,7 @@ impl Heap {
                 Ok(Value::Reference(Some(class_ref)))
             }
             None => {
-                self.run_minor_gc(vm).await?;
+                self.run_minor_gc(stack, vm).await?;
                 match self.free_head {
                     Some(index) => {
                         self.young_count += 1;
@@ -238,7 +241,7 @@ impl Heap {
                         Ok(Value::Reference(Some(class_ref)))
                     }
                     None => {
-                        self.run_major_gc(vm).await?;
+                        self.run_major_gc(stack, vm).await?;
                         match self.free_head {
                             Some(index) => {
                                 self.young_count += 1;

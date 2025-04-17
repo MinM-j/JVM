@@ -24,6 +24,7 @@ impl Frame {
     pub async fn load_constant(
         &mut self,
         index: u16,
+        stack: &Stack,
         vm: &VM,
     ) -> Result<ExecutionResult, JVMError> {
         let constant = self.get_constant(index)?;
@@ -44,21 +45,21 @@ impl Frame {
                     })?;
 
                 let mut heap = vm.heap.write().await;
-                let string_ref = heap.allocate_string(vm, string_value).await?;
+                let string_ref = heap.allocate_string(stack, vm, string_value).await?;
                 self.push(string_ref)?;
             }
-            ConstantInfo::Class(ConstantClassInfo ( name_index )) => {
+            ConstantInfo::Class(ConstantClassInfo(name_index)) => {
                 let class_name = self
                     .constant_pool
                     .get_underlying_string_from_utf8_index(*name_index)
                     .ok_or_else(|| JVMError::Other(format!("Invalid name_index {}", name_index)))?;
                 let loaded_class = vm.class_loader.load_class(class_name, vm).await.unwrap();
                 let mut heap = vm.heap.write().await;
-                let class_ref = heap.allocate_class(vm, loaded_class).await?;
+                let class_ref = heap.allocate_class(stack, vm, loaded_class).await?;
                 //let loaded_class = vm.class_loader.load_class(class_name, vm).await.unwrap();
-                
+
                 //let class_ref = vm.allocate_object(class_name).await?;
-                
+
                 self.push(class_ref)?;
             }
 
@@ -107,19 +108,29 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub async fn ldc(&mut self, index: u8, vm: &VM) -> Result<ExecutionResult, JVMError> {
-        let fut = Box::pin(self.load_constant(index as u16, vm));
+    pub async fn ldc(
+        &mut self,
+        index: u8,
+        stack: &Stack,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
+        let fut = Box::pin(self.load_constant(index as u16, stack, vm));
         fut.await?;
         Ok(ExecutionResult::Continue)
     }
 
-    pub async fn ldc_w(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
-        let fut = Box::pin(self.load_constant(index, vm));
+    pub async fn ldc_w(
+        &mut self,
+        index: u16,
+        stack: &Stack,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
+        let fut = Box::pin(self.load_constant(index, stack, vm));
         fut.await?;
         Ok(ExecutionResult::Continue)
     }
 
-    pub fn ldc2_w(&mut self, index: u16) -> Result<ExecutionResult, JVMError> {
+    pub fn ldc2_w(&mut self, stack: &Stack, index: u16) -> Result<ExecutionResult, JVMError> {
         let constant = self.get_constant(index)?;
 
         match constant {

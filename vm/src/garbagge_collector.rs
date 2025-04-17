@@ -8,8 +8,8 @@ use super::vm::VM;
 use std::sync::Arc;
 
 impl Heap {
-    pub async fn run_minor_gc(&mut self, vm: &VM) -> Result<(), JVMError> {
-        let stack = vm.stack.read().await;
+    pub async fn run_minor_gc(&mut self, stack: &Stack,vm: &VM) -> Result<(), JVMError> {
+        println!("Minorgc");
         self.mark_from_roots(&stack);
 
         let mut new_free_head = None;
@@ -51,8 +51,7 @@ impl Heap {
         Ok(())
     }
 
-    pub async fn run_major_gc(&mut self, vm: &VM) -> Result<(), JVMError> {
-        let stack = vm.stack.read().await;
+    pub async fn run_major_gc(&mut self, stack: &Stack,vm: &VM) -> Result<(), JVMError> {
         self.mark_from_roots(&stack);
 
         let mut new_free_head: Option<usize> = None;
@@ -94,7 +93,7 @@ impl Heap {
         Ok(())
     }
 
-    fn mark_from_roots(&self, stack: &tokio::sync::RwLockReadGuard<Stack>) {
+    fn mark_from_roots(&self, stack: &Stack) {
         for slot in &self.objects {
             if let Slot::Occupied(obj) = slot {
                 obj.header.borrow_mut().mark = false;

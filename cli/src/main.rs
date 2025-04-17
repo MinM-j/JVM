@@ -26,7 +26,7 @@ async fn run(class: &str) {
     //  vm.start(main_class, start_args);
     //let class = class_manager.get_or_resolve_class(main_class).unwrap();
 //    println!("{class}");
-    let mut vm = VM::new(1024).await;
+    let mut vm = VM::new(4).await;
     let main_class = add_prepare(&class, &mut vm);
     let _ = vm.class_loader.add_directory_entry("".to_string());
     //let _ = vm.class_loader.add_directory_entry("../Temp/java/".to_string());

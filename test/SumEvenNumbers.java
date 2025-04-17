@@ -4,11 +4,14 @@ public class SumEvenNumbers {
         int count = 0;
         int number = 2;  // Start from the first even number
         
-        while (count < 20) {
+        while (count < 3) {
             sum += number;
             number += 2;  // Move to the next even number
             count++;
         }
-		System.out.println(sum + " " + count + " " + number);
+		//System.out.println(sum + " " + count + " " + number);
+
+        ioTer.prints("sum of first 3 even numbers starting from 2: ");
+        ioTer.printi(sum);
     }
 }

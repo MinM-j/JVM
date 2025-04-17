@@ -19,10 +19,17 @@ public class MethodOverloadingExample {
         MethodOverloadingExample example = new MethodOverloadingExample();
 
         int sum1 = example.sum(5, 10); // Outputs 15
+        ioTer.prints("sum1: ");
+        ioTer.printi(sum1);
+    
 
         int sum2 = example.sum(5, 10, 15); // Outputs 30
+        ioTer.prints("sum2: ");
+        ioTer.printi(sum2);
 
         double sum3 = example.sum(5.5, 10.5); // Outputs 16.0
+        ioTer.prints("sum3: ");
+        ioTer.printn(sum3);
     }
 }
 

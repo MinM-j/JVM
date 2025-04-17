@@ -3,6 +3,7 @@ use std::fs;
 use parser::class_file_reader::ClassFileReader;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::task;
 use vm::class_loader::class_loader::ClassLoader;
 use vm::vis;
 use vm::vm::VM;
@@ -28,54 +29,21 @@ async fn vis(class: &str) {
     let main_class = add_prepare(&class, &mut vm);
     let class_name = main_class.clone();
     let _ = vm.class_loader.add_directory_entry("".to_string());
-    unsafe {
-        let producer = tokio::spawn(async {
-            vm.invoke_main(&class_name).await;
-        });
-    }
+    /*
+    let producer = tokio::spawn(async {
+        vm.invoke_main(&class_name).await;
+    });
 
     let consumer = tokio::spawn(async {
         vis::consumer_thread().await;
     });
 
     let _ = tokio::try_join!(producer, consumer);
-}
-
-/*
-async fn vis(class: &str) {
-    let vm = Arc::new(Mutex::new(VM::new(4).await)); // VM needs to be thread-safe
-
-    // Clone the main class name for sharing between tasks
-    let main_class = add_prepare(&class, &mut *vm.lock().await);
-    let class_name = main_class.clone();
-
-    // Add directory entry to class loader (handle errors properly)
-    if let Err(e) = vm.lock().await.class_loader.add_directory_entry("".to_string()) {
-        eprintln!("Error adding directory entry: {}", e);
-        return;
-    }
-
-    // Spawning the producer task
-    let producer = tokio::spawn({
-        let vm = Arc::clone(&vm); // Clone the Arc to share ownership
-        async move {
-            let mut vm = vm.lock().await; // Lock the VM to access it
-            if let Err(e) = vm.invoke_main(&class_name).await {
-                eprintln!("Error invoking main method: {:?}", e); // Use `{:?}` for Debug output
-            }
-        }
-    });
-
-    // Spawning the consumer task
-    let consumer = tokio::spawn(async {
-        vis::consumer_thread().await; // Assuming it returns `()`, so no need to match with `Err`
-    });
-
-    // Wait for both tasks to finish
-    let _ = tokio::try_join!(producer, consumer);
-
-}
 */
+        let _ = vm.invoke_main(&class_name).await;
+        vis::consumer_thread().await;
+}
+
 async fn run(class: &str) {
     //   let mut vm = VM::new();
     // TODO provide args as string array

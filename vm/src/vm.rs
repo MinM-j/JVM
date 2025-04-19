@@ -1,6 +1,6 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::state::{Header, MessageData, SERVER_STATE, GLOBAL_BOOL};
+use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE};
 use serde_json::json;
 //use crate::native::NativeMethodLoader;
 use super::native::NativeStack;
@@ -14,6 +14,9 @@ use super::runtime::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use std::env;
+use std::path::PathBuf;
+
 pub struct VM {
     pub stack: Arc<RwLock<Stack>>,
     pub class_loader: ClassLoader,
@@ -24,9 +27,9 @@ pub struct VM {
 impl VM {
     pub async fn new(heap_size: usize) -> Self {
         let init_json = MessageData {
-                header: Header::DATA,
-                json: json!({"header": "init", "memory size": heap_size}).to_string(),
-            };
+            header: Header::DATA,
+            json: json!({"header": "init", "memory size": heap_size}).to_string(),
+        };
         {
             let mut queue = SERVER_STATE.lock().unwrap();
             queue.push_back(init_json);
@@ -56,7 +59,14 @@ impl VM {
             "java/lang/Class",
         ];
         let _ = self.class_loader.add_jar_entry(BASE.to_string());
-        let _ = self.class_loader.add_directory_entry("./IO/".to_string());
+        let exe_path = env::current_exe().expect("Failed to get current exe path");
+        let exe_dir = exe_path.parent().expect("Failed to get exe directory");
+        let lib_path = exe_dir
+            .join("../../IO/")
+            .to_str()
+            .expect("Failed to convert path to string")
+            .to_string();
+        let _ = self.class_loader.add_directory_entry(lib_path);
         for class_name in classes.iter() {
             self.class_loader.load_class(class_name, self).await?;
         }
@@ -82,8 +92,11 @@ impl VM {
     }
 
     fn register_native_methods(&mut self) {
+        let exe_path = env::current_exe().expect("Failed to get current exe path");
+        let exe_dir = exe_path.parent().expect("Failed to get exe directory");
+        let lib_path = exe_dir.join("../../IO/libnative_io.so");
         self.native_stack
-            .register_library("native_io", "./IO/libnative_io.so")
+            .register_library("native_io", lib_path)
             .expect("Failed to load libnative_io.so");
         let printf_key = NameDes {
             name: "printf".to_string(),
@@ -140,7 +153,7 @@ impl VM {
             let code = convert_instructions(main_frame.code.code.clone());
             let stack_json = MessageData {
                 header: Header::DATA,
-                json: json!({"header": "stack", "name": main_frame.method_name_des.name, "action": "push", "locals": main_frame.locals.len(), "operands": main_frame.operands.len(), "code": format!("{:?}", code)}).to_string(),
+                json: json!({"header": "stack", "name": main_frame.method_name_des.name, "action": "push", "locals": main_frame.locals.len(), "operands": main_frame.operands.len(), "code": code}).to_string(),
             };
             {
                 let mut queue = SERVER_STATE.lock().unwrap();
@@ -182,4 +195,4 @@ pub fn convert_instructions(instructions: Vec<Instruction>) -> Vec<Operation> {
         .collect()
 }
 
-const BASE: &str = "/usr/lib/jvm/java-23-openjdk/jmods/java.base.jmod";
+const BASE: &str = "/usr/lib/jvm/java-24-openjdk/jmods/java.base.jmod";

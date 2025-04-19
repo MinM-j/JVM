@@ -7,3 +7,9 @@ test/*/*.class
 IO/*.class
 
 visualize/*
+
+*.png
+
+*.py
+
+Latest3/*

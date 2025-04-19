@@ -1,9 +1,10 @@
 use super::execute::ExecutionResult;
 use crate::jvm_error::JVMError;
-use crate::object::ObjectKind;
+use crate::object::{Object,ObjectKind};
 use crate::runtime::*;
 use crate::vm::VM;
 use parser::constant_pool::{ConstantClassInfo, ConstantInfo};
+use std::sync::Arc;
 
 impl Frame {
     pub async fn newarray(&mut self, atype: u8, stack:&Stack,vm: &VM) -> Result<ExecutionResult, JVMError> {
@@ -214,6 +215,143 @@ impl Frame {
                 }
             }
             None => Err(JVMError::NullReference),
+        }
+    }
+
+    pub async fn multi_anew_array(&mut self, index: u16, dimensions: u8, stack: &Stack, vm: &VM) -> Result<ExecutionResult, JVMError> {
+        if dimensions == 0 || dimensions > 255 {
+            return Err(JVMError::Other(format!("Invalid dimensions for MultiANewArray: {}", dimensions)));
+        }
+
+        let mut sizes = Vec::new();
+        for _ in 0..dimensions {
+            let size = self.pop_expect_int()?;
+            if size < 0 {
+                return Err(JVMError::Other(format!("Negative array size: {}", size)));
+            }
+            sizes.push(size as usize);
+        }
+        sizes.reverse(); 
+
+        let array_type = self.constant_pool
+            .get_underlying_string_from_constant_class_info_index(index)
+            .ok_or_else(|| JVMError::Other(format!("Invalid class index: {}", index)))?;
+        let snap = array_type.clone();
+
+        if !snap.starts_with('[') {
+            return Err(JVMError::Other(format!("Invalid array type: {}", array_type)));
+        }
+
+        let array_ref = self.create_multi_array(stack, vm, &snap, &sizes, dimensions as usize).await?;
+        self.push(Value::Reference(Some(array_ref)))?;
+        Ok(ExecutionResult::Continue)
+    }
+
+    /*
+    async fn create_multi_array(
+        &mut self,
+        stack: &Stack,
+        vm: &VM,
+        array_type: &str,
+        sizes: &[usize],
+        dims_to_init: usize,
+    ) -> Result<Arc<Object>, JVMError> {
+        if dims_to_init == 0 || sizes.is_empty() {
+            return Err(JVMError::Other("Invalid dimensions or sizes for array".to_string()));
+        }
+
+        let size = sizes[0];
+        let element_type = &array_type[1..]; 
+        println!("{dims_to_init}");
+        println!("{element_type}");
+
+        if dims_to_init == 1 {
+            let array_obj = Object::new_array(None, size, array_type);
+            let array_ref = Arc::new(array_obj);
+            let mut heap = vm.heap.write().await;
+            match heap.free_head {
+                Some(index) => {
+                    heap.young_count += 1;
+                    heap.take_slot(index, Arc::clone(&array_ref));
+                    Ok(array_ref)
+                }
+                None => {
+                    heap.run_minor_gc(stack, vm).await?;
+                    match heap.free_head {
+                        Some(index) => {
+                            heap.young_count += 1;
+                            heap.take_slot(index, Arc::clone(&array_ref));
+                            Ok(array_ref)
+                        }
+                        None => Err(JVMError::Other("Heap exhausted after minor GC".to_string())),
+                    }
+                }
+            }
+        } else {
+            let array_obj = Object::new_array(None, size, array_type);
+            let array_ref = Arc::new(array_obj);
+            let mut heap = vm.heap.write().await;
+            match heap.free_head {
+                Some(index) => {
+                    heap.young_count += 1;
+                    heap.take_slot(index, Arc::clone(&array_ref));
+                }
+                None => {
+                    heap.run_minor_gc(stack, vm).await?;
+                    match heap.free_head {
+                        Some(index) => {
+                            heap.young_count += 1;
+                            heap.take_slot(index, Arc::clone(&array_ref));
+                        }
+                        None => return Err(JVMError::Other("Heap exhausted after minor GC".to_string())),
+                    }
+                }
+            }
+
+            let sub_sizes = &sizes[1..];
+            for i in 0..size {
+                let fut = Box::pin(self.create_multi_array(stack, vm, element_type, sub_sizes, dims_to_init - 1));
+                let sub_array = fut.await?;
+                array_ref.set_element(i, Value::Reference(Some(sub_array)))?;
+            }
+            Ok(array_ref)
+        }
+    }
+    */
+    async fn create_multi_array(
+        &mut self,
+        stack: &Stack,
+        vm: &VM,
+        array_type: &str,
+        sizes: &[usize],
+        dims_to_init: usize,
+    ) -> Result<Arc<Object>, JVMError> {
+        if dims_to_init == 0 || sizes.is_empty() {
+            return Err(JVMError::Other("Invalid dimensions or sizes for array".to_string()));
+        }
+
+        let size = sizes[0];
+        let element_type = &array_type[1..];
+
+        let fut = Box::pin(vm.allocate_array(stack, element_type, size as usize));
+        let array_ref = fut.await?;
+
+        if dims_to_init > 1 {
+            let sub_sizes = &sizes[1..];
+            if let Value::Reference(Some(array_obj)) = &array_ref {
+                for i in 0..size {
+                    let fut = Box::pin(self.create_multi_array(stack, vm, element_type, sub_sizes, dims_to_init - 1));
+                    let sub_array = fut.await?;
+                    array_obj.set_element(i, Value::Reference(Some(sub_array)))?;
+                }
+            } else {
+                return Err(JVMError::Other("Invalid array reference".to_string()));
+            }
+        }
+
+        match array_ref {
+            Value::Reference(Some(obj)) => Ok(obj),
+            _ => Err(JVMError::Other("Expected reference value".to_string())),
         }
     }
 }

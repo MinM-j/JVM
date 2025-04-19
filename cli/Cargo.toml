@@ -7,3 +7,9 @@ edition = "2021"
 vm = {path = "../vm"}
 parser = {path = "../parser"}
 tokio = { version = "1.43.0", features = ["full"]}
+
+[profile.release]
+opt-level = 3      
+lto = "fat"       
+codegen-units = 1
+panic = "abort"

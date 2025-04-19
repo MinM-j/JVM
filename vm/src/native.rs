@@ -7,6 +7,7 @@ use libloading::{Library, Symbol};
 use std::collections::HashMap;
 use std::ffi::{c_void, CString};
 use std::sync::Arc;
+use std::path::PathBuf;
 
 pub struct NativeMethodLoader {
     lib: Library,
@@ -26,7 +27,7 @@ impl NativeStack {
         }
     }
 
-    pub fn register_library(&mut self, lib_name: &str, lib_path: &str) -> Result<(), String> {
+    pub fn register_library(&mut self, lib_name: &str, lib_path: PathBuf) -> Result<(), String> {
         let mut loader = NativeMethodLoader::new(lib_path)
             .map_err(|e| format!("Failed to load library {}: {}", lib_name, e))?;
         if lib_name == "native_io" {
@@ -77,7 +78,7 @@ impl NativeStack {
 }
 
 impl NativeMethodLoader {
-    pub fn new(lib_path: &str) -> Result<Self, String> {
+    pub fn new(lib_path: PathBuf) -> Result<Self, String> {
         let lib = unsafe { Library::new(lib_path) }
             .map_err(|e| format!("Failed to load library: {}", e))?;
         Ok(NativeMethodLoader {

@@ -16,7 +16,7 @@ pub enum ExecutionResult {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SerValue {
-    Default,
+    Uninitialized,
     Int(i32),
     Long(i64),
     Float(f32),
@@ -28,7 +28,7 @@ pub fn serialize_vec(values: Vec<Value>) -> Vec<SerValue> {
     values
         .into_iter()
         .map(|v| match v {
-            Value::Default => SerValue::Default,
+            Value::Default => SerValue::Uninitialized,
             Value::Int(i) => SerValue::Int(i),
             Value::Long(l) => SerValue::Long(l),
             Value::Float(f) => SerValue::Float(f),
@@ -100,7 +100,7 @@ impl Stack {
                             let code = convert_instructions(new_frame.code.code.clone());
                             let stack_json = MessageData {
                         header: Header::DATA,
-                        json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len(), "code": format!("{:?}", code)}).to_string(),
+                        json: json!({"header": "stack", "name": new_frame.method_name_des.name, "action": "push", "locals": new_frame.locals.len(), "operands": new_frame.operands.len(), "code": code}).to_string(),
                     };
                             {
                                 let mut queue = SERVER_STATE.lock().unwrap();
@@ -455,6 +455,17 @@ impl Frame {
                 self.anewarray(((*index1 as u16) << 8) | *index2 as u16, stack, vm)
                     .await?
             }
+
+            Operation::Multianewarray(index1, index2, dimension) => {
+                self.multi_anew_array(
+                    ((*index1 as u16) << 8) | *index2 as u16,
+                    *dimension,
+                    stack,
+                    vm,
+                )
+                .await?
+            }
+
             Operation::Iaload => self.array_load("I".to_string(), vm).await?,
             Operation::Laload => self.array_load("J".to_string(), vm).await?,
             Operation::Faload => self.array_load("F".to_string(), vm).await?,

@@ -1,4 +1,4 @@
-use crate::state::{Header, SERVER_STATE};
+use crate::state::{Header, FILE_NAME, SERVER_STATE};
 use futures_util::{SinkExt, StreamExt};
 use tokio::fs::{self, OpenOptions};
 use tokio::io::AsyncWriteExt;
@@ -49,13 +49,13 @@ pub async fn consumer_thread() {
 }
 
 pub async fn file_writer() {
-    let file_path = "visualize/dump.json";
+    let file_path = FILE_NAME.lock().unwrap();
 
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(file_path)
+        .open(file_path.clone())
         .await
         .unwrap();
     loop {

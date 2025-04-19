@@ -1,9 +1,11 @@
 use super::jvm_error::JVMError;
-use super::object::Object;
+use super::object::{Object, ObjectKind};
 use super::runtime::*;
 use super::vm::VM;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE};
+use crate::execute::execute::{serialize_vec, SerValue};
+use crate::state::{Header, MessageData, GLOBAL_BOOL, MEMORY_SNAP, SERVER_STATE};
+use serde::ser::SerializeStruct;
 use serde_json::json;
 use std::sync::Arc;
 
@@ -305,6 +307,12 @@ impl Heap {
             let flag = GLOBAL_BOOL.lock().unwrap();
             if *flag {
                 let (young, old) = self.collect_objects_by_generation();
+                {
+                    let snap = MEMORY_SNAP.lock().unwrap();
+                    if *snap {
+                        println!("Young: {:?}\nOld: {:?}", young, old);
+                    }
+                }
                 let memory_json = MessageData {
                     header: Header::DATA,
                     json: json!({"header": "memory", "young": young, "old": old}).to_string(),
@@ -317,7 +325,12 @@ impl Heap {
         }
     }
 
-    fn collect_objects_by_generation(&self) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    fn collect_objects_by_generation(
+        &self,
+    ) -> (
+        Vec<(String, String, Vec<SerValue>)>,
+        Vec<(String, String, Vec<SerValue>)>,
+    ) {
         let mut gen0 = Vec::new();
         let mut gen1 = Vec::new();
 
@@ -333,9 +346,16 @@ impl Heap {
                     None => "array".to_string(),
                 };
 
+                let serialized_values = match &object.kind {
+                    ObjectKind::ClassInstance { fields } => serialize_vec(fields.borrow().clone()),
+                    ObjectKind::ArrayInstance { elements, .. } => {
+                        serialize_vec(elements.borrow().clone())
+                    }
+                };
+
                 match generation {
-                    0 => gen0.push((object_id, class_name)),
-                    1 => gen1.push((object_id, class_name)),
+                    0 => gen0.push((object_id, class_name, serialized_values)),
+                    1 => gen1.push((object_id, class_name, serialized_values)),
                     _ => {}
                 }
             }

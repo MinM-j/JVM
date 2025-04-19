@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task;
 use vm::class_loader::class_loader::ClassLoader;
+use vm::state::{FILE_NAME, MEMORY_SIZE, MEMORY_SNAP};
 use vm::vis;
 use vm::vm::VM;
 
@@ -13,36 +14,73 @@ async fn main() {
     let args = std::env::args().collect::<Vec<_>>();
 
     if args.len() < 3 {
-        panic!("Invalid args\n usage: <exe> [ parse | run ] <class_file>");
+        panic!("Invalid args\n usage: <exe> [ parse | run | vis] <class_file>");
+    }
+
+    if let Some(mem_pos) = args.iter().position(|arg| arg == "--mem") {
+        if mem_pos + 1 < args.len() {
+            if let Ok(mem_value) = args[mem_pos + 1].parse::<usize>() {
+                let mut mem_size = MEMORY_SIZE.lock().unwrap();
+                *mem_size = mem_value;
+            } else {
+                panic!("Invalid value for mem. Please provide an integer.");
+            }
+        } else {
+            panic!("--mem flag requires a value.");
+        }
+    }
+
+    if let Some(file_pos) = args.iter().position(|arg| arg == "--file") {
+        if file_pos + 1 < args.len() {
+            if args.contains(&"--vis".to_string()) {
+                let file_value = &args[file_pos + 1];
+                if file_value.ends_with(".json") {
+                    let mut file_name = FILE_NAME.lock().unwrap();
+                    *file_name = file_value.clone();
+                } else {
+                    panic!("--file value must end with .json.");
+                }
+            } else {
+                panic!("--file flag requires --vis to be present.");
+            }
+        } else {
+            panic!("--file flag requires a value.");
+        }
+    }
+
+    if args.iter().any(|arg| arg == "--snap") {
+        let mut snap = MEMORY_SNAP.lock().unwrap();
+        *snap = true;
     }
 
     match args.get(1).unwrap().as_str() {
-        "parse" => parse(&args[2].as_str()),
-        "run" => run(&args[2].as_str()).await,
-        "vis" => vis(&args[2].as_str()).await,
+        "--parse" => parse(&args[2].as_str()),
+        "--run" => run(&args[2].as_str()).await,
+        "--vis" => vis(&args[2].as_str()).await,
         cmd => panic!("command {} not implemented yet.", cmd),
     }
 }
 
 async fn vis(class: &str) {
-    let mut vm = VM::new(4).await;
+    let mem_size = MEMORY_SIZE.lock().unwrap();
+    let mut vm = VM::new(*mem_size).await;
     let main_class = add_prepare(&class, &mut vm);
     let class_name = main_class.clone();
     let _ = vm.class_loader.add_directory_entry("".to_string());
     /*
-    let producer = tokio::spawn(async {
-        vm.invoke_main(&class_name).await;
-    });
+        let producer = tokio::spawn(async {
+            vm.invoke_main(&class_name).await;
+        });
 
-    let consumer = tokio::spawn(async {
-        vis::consumer_thread().await;
-    });
+        let consumer = tokio::spawn(async {
+            vis::consumer_thread().await;
+        });
 
-    let _ = tokio::try_join!(producer, consumer);
-*/
-        let _ = vm.invoke_main(&class_name).await;
-        //vis::consumer_thread().await;
-        vis::file_writer().await;
+        let _ = tokio::try_join!(producer, consumer);
+    */
+    let _ = vm.invoke_main(&class_name).await;
+    //vis::consumer_thread().await;
+    vis::file_writer().await;
 }
 
 async fn run(class: &str) {
@@ -52,7 +90,8 @@ async fn run(class: &str) {
     //  vm.start(main_class, start_args);
     //let class = class_manager.get_or_resolve_class(main_class).unwrap();
     //    println!("{class}");
-    let mut vm = VM::new(4).await;
+    let mem_size = MEMORY_SIZE.lock().unwrap();
+    let mut vm = VM::new(*mem_size).await;
     let main_class = add_prepare(&class, &mut vm);
     let _ = vm.class_loader.add_directory_entry("".to_string());
     //let _ = vm.class_loader.add_directory_entry("../Temp/java/".to_string());

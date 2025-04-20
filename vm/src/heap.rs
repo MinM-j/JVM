@@ -302,7 +302,7 @@ impl Heap {
         }
     }
 
-    pub fn memory_json(&mut self) {
+    pub fn memory_json(&self) {
         {
             let flag = GLOBAL_BOOL.lock().unwrap();
             if *flag {
@@ -328,8 +328,8 @@ impl Heap {
     fn collect_objects_by_generation(
         &self,
     ) -> (
-        Vec<(String, String, Vec<SerValue>)>,
-        Vec<(String, String, Vec<SerValue>)>,
+        Vec<(String, String, Vec<SerValue>, Vec<SerValue>)>,
+        Vec<(String, String, Vec<SerValue>, Vec<SerValue>)>,
     ) {
         let mut gen0 = Vec::new();
         let mut gen1 = Vec::new();
@@ -346,6 +346,11 @@ impl Heap {
                     None => "array".to_string(),
                 };
 
+                let static_value = match &object.class {
+                    Some(cls) => serialize_vec(cls.static_values.borrow().clone()),
+                    None => Vec::new(),
+                };
+
                 let serialized_values = match &object.kind {
                     ObjectKind::ClassInstance { fields } => serialize_vec(fields.borrow().clone()),
                     ObjectKind::ArrayInstance { elements, .. } => {
@@ -354,8 +359,8 @@ impl Heap {
                 };
 
                 match generation {
-                    0 => gen0.push((object_id, class_name, serialized_values)),
-                    1 => gen1.push((object_id, class_name, serialized_values)),
+                    0 => gen0.push((object_id, class_name, static_value, serialized_values)),
+                    1 => gen1.push((object_id, class_name, static_value, serialized_values)),
                     _ => {}
                 }
             }

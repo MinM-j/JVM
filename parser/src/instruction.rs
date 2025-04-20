@@ -1,10 +1,11 @@
 // https://en.wikipedia.org/wiki/ListofJavabytecode_instructions
-use serde::{Deserialize, Serialize};
 use super::types::*;
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct Instruction(pub U4, pub Operation); //U2 = address
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+//#[derive(Debug, Clone)]
 pub enum Operation {
     Aaload,
     Aastore,

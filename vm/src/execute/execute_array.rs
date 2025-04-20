@@ -1,13 +1,18 @@
 use super::execute::ExecutionResult;
 use crate::jvm_error::JVMError;
-use crate::object::{Object,ObjectKind};
+use crate::object::{Object, ObjectKind};
 use crate::runtime::*;
 use crate::vm::VM;
 use parser::constant_pool::{ConstantClassInfo, ConstantInfo};
 use std::sync::Arc;
 
 impl Frame {
-    pub async fn newarray(&mut self, atype: u8, stack:&Stack,vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn newarray(
+        &mut self,
+        atype: u8,
+        stack: &Stack,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let length = self.pop_expect_int()?;
         let element_type = match atype {
             4 => "Z",
@@ -26,7 +31,12 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub async fn anewarray(&mut self, index: u16, stack:&Stack,vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn anewarray(
+        &mut self,
+        index: u16,
+        stack: &Stack,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let length = self.pop_expect_int()? as usize;
         let cp_entry = self.constant_pool.get_entry(index).ok_or_else(|| {
             JVMError::ConstantPoolIndexOutOfBounds {
@@ -52,7 +62,11 @@ impl Frame {
         Ok(ExecutionResult::Continue)
     }
 
-    pub async fn array_load(&mut self, data_type: String, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn array_load(
+        &mut self,
+        data_type: String,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let index = self.pop_expect_int()? as usize;
         let array_ref = self.pop_expect_reference()?;
         match array_ref {
@@ -86,7 +100,9 @@ impl Frame {
                     _ => {
                         //let fut = Box::pin(vm.allocate_object("/java/lang/ArrayIndexOutOfBoundsException"));
                         //let exception = fut.await?;
-                        return Ok(ExecutionResult::Throw("java/lang/ArrayIndexOutOfBoundsException".to_string()));
+                        return Ok(ExecutionResult::Throw(
+                            "java/lang/ArrayIndexOutOfBoundsException".to_string(),
+                        ));
                     }
                 };
                 self.push(value.clone())?;
@@ -96,7 +112,11 @@ impl Frame {
         }
     }
 
-    pub async fn array_store(&mut self, _data_type: String, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn array_store(
+        &mut self,
+        _data_type: String,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         let value = match _data_type.as_str() {
             "I" => self.pop_expect_int().map(Value::Int)?,
             "J" => self.pop_expect_long().map(Value::Long)?,
@@ -181,20 +201,23 @@ impl Frame {
                     _ => {}
                 }
                 /*
-                array.set_element(index, value).map_err(|_| {
-                        let fut = Box::pin(vm.allocate_object("/java/lang/ArrayIndexOutOfBoundsException"));
-                    let exception = tokio::runtime::Handle::current().block_on(fut)?;
-                        return Ok(ExecutionResult::Throw(exception));
-                });
-*/
+                                array.set_element(index, value).map_err(|_| {
+                                        let fut = Box::pin(vm.allocate_object("/java/lang/ArrayIndexOutOfBoundsException"));
+                                    let exception = tokio::runtime::Handle::current().block_on(fut)?;
+                                        return Ok(ExecutionResult::Throw(exception));
+                                });
+                */
                 let _ = match array.set_element(index, value) {
                     Ok(()) => Ok::<ExecutionResult, JVMError>(ExecutionResult::Continue),
                     Err(_) => {
                         //let fut = Box::pin(vm.allocate_object("/java/lang/ArrayIndexOutOfBoundsException"));
                         //let exception = fut.await?;
-                        return Ok(ExecutionResult::Throw("java/lang/ArrayIndexOutOfBoundsException".to_string()));
+                        return Ok(ExecutionResult::Throw(
+                            "java/lang/ArrayIndexOutOfBoundsException".to_string(),
+                        ));
                     }
                 };
+                vm.memory_snap().await;
                 Ok(ExecutionResult::Continue)
             }
             None => Err(JVMError::NullReference),
@@ -218,9 +241,18 @@ impl Frame {
         }
     }
 
-    pub async fn multi_anew_array(&mut self, index: u16, dimensions: u8, stack: &Stack, vm: &VM) -> Result<ExecutionResult, JVMError> {
+    pub async fn multi_anew_array(
+        &mut self,
+        index: u16,
+        dimensions: u8,
+        stack: &Stack,
+        vm: &VM,
+    ) -> Result<ExecutionResult, JVMError> {
         if dimensions == 0 || dimensions > 255 {
-            return Err(JVMError::Other(format!("Invalid dimensions for MultiANewArray: {}", dimensions)));
+            return Err(JVMError::Other(format!(
+                "Invalid dimensions for MultiANewArray: {}",
+                dimensions
+            )));
         }
 
         let mut sizes = Vec::new();
@@ -231,18 +263,24 @@ impl Frame {
             }
             sizes.push(size as usize);
         }
-        sizes.reverse(); 
+        sizes.reverse();
 
-        let array_type = self.constant_pool
+        let array_type = self
+            .constant_pool
             .get_underlying_string_from_constant_class_info_index(index)
             .ok_or_else(|| JVMError::Other(format!("Invalid class index: {}", index)))?;
         let snap = array_type.clone();
 
         if !snap.starts_with('[') {
-            return Err(JVMError::Other(format!("Invalid array type: {}", array_type)));
+            return Err(JVMError::Other(format!(
+                "Invalid array type: {}",
+                array_type
+            )));
         }
 
-        let array_ref = self.create_multi_array(stack, vm, &snap, &sizes, dimensions as usize).await?;
+        let array_ref = self
+            .create_multi_array(stack, vm, &snap, &sizes, dimensions as usize)
+            .await?;
         self.push(Value::Reference(Some(array_ref)))?;
         Ok(ExecutionResult::Continue)
     }
@@ -261,7 +299,7 @@ impl Frame {
         }
 
         let size = sizes[0];
-        let element_type = &array_type[1..]; 
+        let element_type = &array_type[1..];
         println!("{dims_to_init}");
         println!("{element_type}");
 
@@ -327,7 +365,9 @@ impl Frame {
         dims_to_init: usize,
     ) -> Result<Arc<Object>, JVMError> {
         if dims_to_init == 0 || sizes.is_empty() {
-            return Err(JVMError::Other("Invalid dimensions or sizes for array".to_string()));
+            return Err(JVMError::Other(
+                "Invalid dimensions or sizes for array".to_string(),
+            ));
         }
 
         let size = sizes[0];
@@ -340,7 +380,13 @@ impl Frame {
             let sub_sizes = &sizes[1..];
             if let Value::Reference(Some(array_obj)) = &array_ref {
                 for i in 0..size {
-                    let fut = Box::pin(self.create_multi_array(stack, vm, element_type, sub_sizes, dims_to_init - 1));
+                    let fut = Box::pin(self.create_multi_array(
+                        stack,
+                        vm,
+                        element_type,
+                        sub_sizes,
+                        dims_to_init - 1,
+                    ));
                     let sub_array = fut.await?;
                     array_obj.set_element(i, Value::Reference(Some(sub_array)))?;
                 }

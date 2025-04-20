@@ -31,10 +31,8 @@ impl NativeStack {
         let mut loader = NativeMethodLoader::new(lib_path)
             .map_err(|e| format!("Failed to load library {}: {}", lib_name, e))?;
         if lib_name == "native_io" {
-            loader.load_function("Java_ioTer_printf")?;
-            loader.load_function("Java_ioTer_add")?;
             loader.load_function("Java_ioTer_prints")?;
-            loader.load_function("Java_ioTer_printn")?;
+            loader.load_function("Java_ioTer_printd")?;
             loader.load_function("Java_ioTer_printi")?;
         } else if lib_name == "math" {
             loader.load_function("Java_Math_add")?;
@@ -114,100 +112,6 @@ impl NativeMethodLoader {
         let return_type = param_types.return_type;
 
         match name {
-            "Java_NativeIO_printf" => {
-                if args.is_empty() {
-                    return Err("No arguments provided for printf".to_string());
-                }
-                let format = match &args[0] {
-                    Value::Reference(Some(obj)) => extract_string(obj)?,
-                    _ => return Err("First argument must be a String format".to_string()),
-                };
-                let c_format = CString::new(format)
-                    .map_err(|e| format!("CString conversion failed: {}", e))?;
-
-                cif_args.push(Type::pointer());
-                call_args.push(Arg::new(&c_format.as_ptr()));
-
-                if args.len() > 1 {
-                    if let Value::Reference(Some(array_obj)) = &args[1] {
-                        if let ObjectKind::ArrayInstance {
-                            elements,
-                            element_type,
-                            ..
-                        } = &array_obj.kind
-                        {
-                            if element_type == "[Ljava/lang/Object;" {
-                                for (arg, expected_type) in elements
-                                    .borrow()
-                                    .iter()
-                                    .zip(param_types.arg_types.iter().skip(1))
-                                {
-                                    match (arg, expected_type.as_str()) {
-                                        (Value::Int(i), "I")
-                                        | (Value::Int(i), "B")
-                                        | (Value::Int(i), "S")
-                                        | (Value::Int(i), "C")
-                                        | (Value::Int(i), "Z") => {
-                                            cif_args.push(Type::i32());
-                                            call_args.push(Arg::new(i));
-                                        }
-                                        (Value::Long(l), "J") => {
-                                            cif_args.push(Type::i64());
-                                            call_args.push(Arg::new(l));
-                                        }
-                                        (Value::Float(f), "F") => {
-                                            cif_args.push(Type::f32());
-                                            call_args.push(Arg::new(f));
-                                        }
-                                        (Value::Double(d), "D") => {
-                                            cif_args.push(Type::f64());
-                                            call_args.push(Arg::new(d));
-                                        }
-                                        (Value::Reference(Some(obj)), "Ljava/lang/String;") => {
-                                            let s = extract_string(obj)?;
-                                            let c_s = CString::new(s).map_err(|e| e.to_string())?;
-                                            c_strings.push(c_s);
-                                            cif_args.push(Type::pointer());
-                                            call_args.push(Arg::new(
-                                                &c_strings.last().unwrap().as_ptr(),
-                                            ));
-                                        }
-                                        _ => {
-                                            return Err(format!(
-                                                "Type mismatch: arg={:?}, expected={}",
-                                                arg, expected_type
-                                            ))
-                                        }
-                                    }
-                                }
-                            } else {
-                                return Err(format!(
-                                    "Expected [Ljava/lang/Object; got {}",
-                                    element_type
-                                ));
-                            }
-                        } else {
-                            return Err("Varargs argument is not an array".to_string());
-                        }
-                    } else {
-                        return Err("Second argument must be an array for varargs".to_string());
-                    }
-                }
-            }
-            "Java_ioTer_add" => {
-                if args.len() != 2 {
-                    return Err(format!("Expected 2 arguments for add, got {}", args.len()));
-                }
-                match (&args[0], &args[1]) {
-                    (Value::Int(a), Value::Int(b)) => {
-                        cif_args.push(Type::i32());
-                        cif_args.push(Type::i32());
-                        call_args.push(Arg::new(a));
-                        call_args.push(Arg::new(b));
-                    }
-                    _ => return Err("Expected two int arguments for add".to_string()),
-                }
-            }
             "Java_ioTer_prints" => {
                 if args.len() != 1 {
                     return Err(format!("Expected 1 arguments for add, got {}", args.len()));
@@ -220,18 +124,11 @@ impl NativeMethodLoader {
                         c_strings.push(c_string); // Keep CString alive
                         cif_args.push(Type::pointer());
                         call_args.push(Arg::new(&c_strings.last().unwrap().as_ptr()));
-                        /*
-                                            let string_value = extract_string(obj)?;
-                                            let c_string = CString::new(string_value)
-                                                .map_err(|e| format!("CString conversion failed: {}", e))?;
-                                                cif_args.push(Type::pointer());
-                                                call_args.push(Arg::new(&c_string.as_ptr()));
-                        */
                     }
                     _ => return Err("Expected string argument".to_string()),
                 }
             }
-            "Java_ioTer_printn" => {
+            "Java_ioTer_printd" => {
                 if args.len() != 1 {
                     return Err(format!(
                         "Expected 1 argument for printNum, got {}",

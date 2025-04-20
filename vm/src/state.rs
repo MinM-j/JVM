@@ -24,3 +24,5 @@ pub static MEMORY_SIZE: Lazy<Arc<Mutex<usize>>> = Lazy::new(|| Arc::new(Mutex::n
 pub static MEMORY_SNAP: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::new(false)));
 
 pub static FILE_NAME: Lazy<Arc<Mutex<String>>> = Lazy::new(|| Arc::new(Mutex::new("dump.json".to_string())));
+
+pub static VIS_BOOL: Lazy<Arc<Mutex<bool>>> = Lazy::new(|| Arc::new(Mutex::new(false)));

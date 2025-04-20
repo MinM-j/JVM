@@ -71,20 +71,22 @@ impl Stack {
             let operation = self.frames[frame_index]
                 .code
                 .get_operation_at_index(self.frames[frame_index].pc);
-            {
-                let flag = GLOBAL_BOOL.lock().unwrap();
-                if *flag {
-                    let json_cei = MessageData {
-                        header: Header::DATA,
-                        json: json!({"header": "cei", "value": format!("{:?}", operation)})
-                            .to_string(),
-                    };
-                    {
-                        let mut queue = SERVER_STATE.lock().unwrap();
-                        queue.push_back(json_cei);
-                    }
-                }
-            }
+            /*
+                        {
+                            let flag = GLOBAL_BOOL.lock().unwrap();
+                            if *flag {
+                                let json_cei = MessageData {
+                                    header: Header::DATA,
+                                    json: json!({"header": "cei", "value": format!("{:?}", operation)})
+                                        .to_string(),
+                                };
+                                {
+                                    let mut queue = SERVER_STATE.lock().unwrap();
+                                    queue.push_back(json_cei);
+                                }
+                            }
+                        }
+            */
             let stack_snapshot = self.clone();
             match self.frames[frame_index]
                 .execute_instruction(&operation, &stack_snapshot, vm)
@@ -496,7 +498,7 @@ impl Frame {
             Operation::Dup2x1 => self.dup2_x1()?,
             Operation::Dup2x2 => self.dup2_x2()?,
             Operation::Putfield(index1, index2) => {
-                self.putfield(((*index1 as u16) << 8) | *index2 as u16)
+                self.putfield(((*index1 as u16) << 8) | *index2 as u16, vm)
                     .await?
             }
             Operation::Getfield(index1, index2) => {

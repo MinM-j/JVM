@@ -20,7 +20,11 @@ impl Frame {
         }
     }
 
-    pub fn is_compatible_class(&self, actual_class: &LoadedClass, expected_class_name: &str) -> bool {
+    pub fn is_compatible_class(
+        &self,
+        actual_class: &LoadedClass,
+        expected_class_name: &str,
+    ) -> bool {
         let mut current = Some(actual_class);
         while let Some(cls) = current {
             if cls.class_name == expected_class_name {
@@ -75,7 +79,7 @@ impl Frame {
         Ok((name, type_))
     }
 
-    pub async fn putfield(&mut self, index: u16) -> Result<ExecutionResult, JVMError> {
+    pub async fn putfield(&mut self, index: u16, vm: &VM) -> Result<ExecutionResult, JVMError> {
         let cp_entry = self.constant_pool.get_entry(index).ok_or_else(|| {
             JVMError::ConstantPoolIndexOutOfBounds {
                 index,
@@ -130,6 +134,7 @@ impl Frame {
                 });
             }
             obj.set_field(&name, value)?;
+            vm.memory_snap().await;
             Ok(ExecutionResult::Continue)
         } else {
             Err(JVMError::NullReference)
@@ -232,6 +237,7 @@ impl Frame {
         let fut = Box::pin(vm.class_loader.load_class(&class_name, vm));
         let class = fut.await.unwrap();
         class.set_static_field(&name, value)?;
+        vm.memory_snap().await;
         Ok(ExecutionResult::Continue)
     }
 

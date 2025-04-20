@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task;
 use vm::class_loader::class_loader::ClassLoader;
-use vm::state::{FILE_NAME, MEMORY_SIZE, MEMORY_SNAP};
+use vm::state::{FILE_NAME, MEMORY_SIZE, MEMORY_SNAP, VIS_BOOL};
 use vm::vis;
 use vm::vm::VM;
 
@@ -49,14 +49,24 @@ async fn main() {
     }
 
     if args.iter().any(|arg| arg == "--snap") {
-        let mut snap = MEMORY_SNAP.lock().unwrap();
-        *snap = true;
+        if args.contains(&"--vis".to_string()) {
+            let mut snap = MEMORY_SNAP.lock().unwrap();
+            *snap = true;
+        } else {
+            panic!("--file flag requires --vis to be present.");
+        }
     }
 
     match args.get(1).unwrap().as_str() {
         "--parse" => parse(&args[2].as_str()),
         "--run" => run(&args[2].as_str()).await,
-        "--vis" => vis(&args[2].as_str()).await,
+        "--vis" => {
+            {
+                let mut vis_flag = VIS_BOOL.lock().unwrap();
+                *vis_flag = true;
+            }
+            vis(&args[2].as_str()).await
+        }
         cmd => panic!("command {} not implemented yet.", cmd),
     }
 }

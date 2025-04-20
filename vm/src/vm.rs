@@ -1,6 +1,6 @@
 use crate::class_loader::class_loading_error::ClassLoadingError;
 use crate::class_loader::loaded_class::LoadedClass;
-use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE};
+use crate::state::{Header, MessageData, GLOBAL_BOOL, SERVER_STATE, VIS_BOOL};
 use serde_json::json;
 //use crate::native::NativeMethodLoader;
 use super::native::NativeStack;
@@ -98,20 +98,6 @@ impl VM {
         self.native_stack
             .register_library("native_io", lib_path)
             .expect("Failed to load libnative_io.so");
-        let printf_key = NameDes {
-            name: "printf".to_string(),
-            des: "(Ljava/lang/String;[Ljava/lang/Object;)V".to_string(),
-        };
-        self.native_stack
-            .register_method(printf_key, "native_io")
-            .expect("Failed to register Java_ioTer_printf");
-        let add_key = NameDes {
-            name: "add".to_string(),
-            des: "(II)I".to_string(),
-        };
-        self.native_stack
-            .register_method(add_key, "native_io")
-            .expect("Failed to register Java_ioTer_add");
         let prints_key = NameDes {
             name: "prints".to_string(),
             des: "(Ljava/lang/String;)V".to_string(),
@@ -119,13 +105,13 @@ impl VM {
         self.native_stack
             .register_method(prints_key, "native_io")
             .expect("Failed to register Java_ioTer_prints");
-        let print_num_key = NameDes {
-            name: "printn".to_string(),
+        let print_dec_key = NameDes {
+            name: "printd".to_string(),
             des: "(D)V".to_string(),
         };
         self.native_stack
-            .register_method(print_num_key, "native_io")
-            .expect("Failed to register Java_ioTer_printn");
+            .register_method(print_dec_key, "native_io")
+            .expect("Failed to register Java_ioTer_printd");
         let print_int_key = NameDes {
             name: "printi".to_string(),
             des: "(I)V".to_string(),
@@ -148,23 +134,27 @@ impl VM {
         };
         let (main_class, main_code) = Frame::lookup_method(&main_class, &main_name_des)?;
         let main_frame = Frame::new(main_class, &main_name_des, main_code);
+
+        let mut stack = self.stack.write().await;
         {
-            let mut stack = self.stack.write().await;
-            let code = convert_instructions(main_frame.code.code.clone());
-            let stack_json = MessageData {
+            let vis_flag = VIS_BOOL.lock().unwrap();
+            if *vis_flag {
+                let code = convert_instructions(main_frame.code.code.clone());
+                let stack_json = MessageData {
                 header: Header::DATA,
                 json: json!({"header": "stack", "name": main_frame.method_name_des.name, "action": "push", "locals": main_frame.locals.len(), "operands": main_frame.operands.len(), "code": code}).to_string(),
             };
-            {
-                let mut queue = SERVER_STATE.lock().unwrap();
-                queue.push_back(stack_json);
-                let mut value = GLOBAL_BOOL.lock().unwrap();
-                *value = true;
+                {
+                    let mut queue = SERVER_STATE.lock().unwrap();
+                    queue.push_back(stack_json);
+                    let mut value = GLOBAL_BOOL.lock().unwrap();
+                    *value = true;
+                }
             }
-            let _ = stack.push_frame(main_frame)?;
-            let _ = stack.execute_current_frame(self).await?;
-            //println!("{:?}", damn);
         }
+        let _ = stack.push_frame(main_frame)?;
+        let _ = stack.execute_current_frame(self).await?;
+        //println!("{:?}", damn);
         Ok(())
     }
 
@@ -185,6 +175,11 @@ impl VM {
     ) -> Result<Value, JVMError> {
         let mut heap = self.heap.write().await;
         heap.allocate_array(stack, self, element_type, length).await
+    }
+
+    pub async fn memory_snap(&self) {
+        let heap = self.heap.read().await;
+        heap.memory_json();
     }
 }
 

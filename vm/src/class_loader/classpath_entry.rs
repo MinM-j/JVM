@@ -21,7 +21,7 @@ impl ClassPathEntry for DirectoryEntry {
     async fn read_class(&self, class_name: &str) -> Result<Vec<u8>, ClassLoadingError> {
         let class_file_path = class_name.to_string() + ".class";
         let full_path = Path::new(&self.path).join(&class_file_path);
-       // println!("{:?}",full_path);
+        // println!("{:?}",full_path);
         fs::read(&full_path).map_err(|e| ClassLoadingError::IoError(e))
     }
 }

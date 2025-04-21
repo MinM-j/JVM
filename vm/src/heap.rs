@@ -343,7 +343,12 @@ impl Heap {
 
                 let class_name = match &object.class {
                     Some(cls) => cls.class_name.clone(),
-                    None => "array".to_string(),
+                    None => match &object.kind {
+                        ObjectKind::ArrayInstance { element_type, .. } => {
+                            format!("array:{element_type}").to_string()
+                        }
+                        _ => unreachable!(),
+                    },
                 };
 
                 let static_value = match &object.class {

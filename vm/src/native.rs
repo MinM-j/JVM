@@ -6,8 +6,8 @@ use libffi::middle::{Arg, Cif, CodePtr, Type};
 use libloading::{Library, Symbol};
 use std::collections::HashMap;
 use std::ffi::{c_void, CString};
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 pub struct NativeMethodLoader {
     lib: Library,
@@ -32,8 +32,11 @@ impl NativeStack {
             .map_err(|e| format!("Failed to load library {}: {}", lib_name, e))?;
         if lib_name == "native_io" {
             loader.load_function("Java_ioTer_prints")?;
+            loader.load_function("Java_ioTer_printca")?;
             loader.load_function("Java_ioTer_printd")?;
             loader.load_function("Java_ioTer_printi")?;
+            loader.load_function("Java_ioTer_scani")?;
+            loader.load_function("Java_ioTer_scand")?;
         } else if lib_name == "math" {
             loader.load_function("Java_Math_add")?;
         }
@@ -59,6 +62,7 @@ impl NativeStack {
         args: &[Value],
         descriptor: &str,
     ) -> Result<Value, String> {
+
         let lib_name = self
             .native_method_map
             .iter()
@@ -128,6 +132,22 @@ impl NativeMethodLoader {
                     _ => return Err("Expected string argument".to_string()),
                 }
             }
+            "Java_ioTer_printca" => {
+                if args.len() != 1 {
+                    return Err(format!("Expected 1 arguments for add, got {}", args.len()));
+                }
+                match &args[0] {
+                    Value::Reference(Some(obj)) => {
+                        let string_value = extract_from_char_array(obj)?;
+                        let c_string = CString::new(string_value)
+                            .map_err(|e| format!("CString conversion failed: {}", e))?;
+                        c_strings.push(c_string); // Keep CString alive
+                        cif_args.push(Type::pointer());
+                        call_args.push(Arg::new(&c_strings.last().unwrap().as_ptr()));
+                    }
+                    _ => return Err("Expected string argument".to_string()),
+                }
+            }
             "Java_ioTer_printd" => {
                 if args.len() != 1 {
                     return Err(format!(
@@ -152,11 +172,38 @@ impl NativeMethodLoader {
                     ));
                 }
                 let number = match &args[0] {
-                    Value::Int(i) => *i ,
+                    Value::Int(i) => *i,
                     _ => return Err("Argument must be a number (int)".to_string()),
                 };
                 cif_args.push(Type::i32());
                 call_args.push(Arg::new(&number));
+            }
+            "Java_ioTer_scani" => {
+                if !args.is_empty() {
+                    return Err(format!(
+                        "Expected 0 arguments for scani, got {}",
+                        args.len()
+                    ));
+                }
+                cif_args.clear();
+            }
+            "Java_ioTer_scans" => {
+                if !args.is_empty() {
+                    return Err(format!(
+                        "Expected 0 arguments for scans, got {}",
+                        args.len()
+                    ));
+                }
+                cif_args.clear();
+            }
+            "Java_ioTer_scand" => {
+                if !args.is_empty() {
+                    return Err(format!(
+                        "Expected 0 arguments for scand, got {}",
+                        args.len()
+                    ));
+                }
+                cif_args.clear();
             }
             _ => return Err(format!("Unknown native function: {}", name)),
         }
@@ -165,12 +212,36 @@ impl NativeMethodLoader {
         let code_ptr = CodePtr::from_ptr(*func_ptr as *const c_void);
 
         unsafe {
-            if return_type == "V" {
-                cif.call::<()>(code_ptr, &call_args);
-                Ok(Value::Int(0))
-            } else {
-                let result: i32 = cif.call(code_ptr, &call_args);
-                Ok(Value::Int(result))
+            match name {
+                "Java_ioTer_scani" => {
+                    let result: i32 = cif.call(code_ptr, &call_args);
+                    Ok(Value::Int(result))
+                }
+                /*
+                                "Java_ioTer_scans" => {
+                                    let result: *const c_char = cif.call(code_ptr, &call_args);
+                                    let c_str = CStr::from_ptr(result);
+                                    let str_slice = c_str
+                                        .to_str()
+                                        .map_err(|e| format!("Invalid string from scans: {}", e))?;
+                                    let string_obj = create_string_object(str_slice, vm)?;
+                                    std::ptr::drop_in_place(result as *mut c_char);
+                                    Ok(Value::Reference(Some(string_obj)))
+                                }
+                */
+                "Java_ioTer_scand" => {
+                    let result: f64 = cif.call(code_ptr, &call_args);
+                    Ok(Value::Double(result))
+                }
+                _ => {
+                    if return_type == "V" {
+                        cif.call::<()>(code_ptr, &call_args);
+                        Ok(Value::Int(0))
+                    } else {
+                        let result: i32 = cif.call(code_ptr, &call_args);
+                        Ok(Value::Int(result))
+                    }
+                }
             }
         }
     }
@@ -206,5 +277,27 @@ fn extract_string(obj: &Arc<Object>) -> Result<String, String> {
         Err("No char array found in String object fields".to_string())
     } else {
         Err(format!("Object is not a ClassInstance: {:?}", obj.kind))
+    }
+}
+
+fn extract_from_char_array(obj: &Arc<Object>) -> Result<String, String> {
+    if let ObjectKind::ArrayInstance { elements, element_type, .. } = &obj.kind {
+        // Ensure the element type is "C" (char array)
+        if element_type == "C" {
+            // Map the elements (int values) to their corresponding chars and collect into a String
+            let chars: String = elements
+                .borrow()
+                .iter()
+                .map(|v| match v {
+                    Value::Int(c) => *c as u8 as char,
+                    _ => '?', // Handle any unexpected value types with a placeholder
+                })
+                .collect();
+            return Ok(chars);
+        } else {
+            Err("Array elements are not of type 'C'".to_string())
+        }
+    } else {
+        Err(format!("Object is not an ArrayInstance: {:?}", obj.kind))
     }
 }

@@ -105,6 +105,13 @@ impl VM {
         self.native_stack
             .register_method(prints_key, "native_io")
             .expect("Failed to register Java_ioTer_prints");
+        let printca_key = NameDes {
+            name: "printca".to_string(),
+            des: "([C)V".to_string(),
+        };
+        self.native_stack
+            .register_method(printca_key, "native_io")
+            .expect("Failed to register Java_ioTer_printca");
         let print_dec_key = NameDes {
             name: "printd".to_string(),
             des: "(D)V".to_string(),
@@ -119,6 +126,20 @@ impl VM {
         self.native_stack
             .register_method(print_int_key, "native_io")
             .expect("Failed to register Java_ioTer_printi");
+        let scan_int_key = NameDes {
+            name: "scani".to_string(),
+            des: "()I".to_string(),
+        };
+        self.native_stack
+            .register_method(scan_int_key, "native_io")
+            .expect("Failed to register Java_ioTer_scani");
+        let scan_double_key = NameDes {
+            name: "scand".to_string(),
+            des: "()D".to_string(),
+        };
+        self.native_stack
+            .register_method(scan_double_key, "native_io")
+            .expect("Failed to register Java_ioTer_scand");
     }
 
     pub async fn invoke_main(&self, class_name: &str) -> Result<(), JVMError> {

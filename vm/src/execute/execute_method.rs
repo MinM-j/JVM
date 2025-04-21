@@ -59,6 +59,7 @@ impl Frame {
 
     fn prepare_arguments(&mut self, descriptor: &str) -> Result<Vec<Value>, JVMError> {
         let param_count = Self::count_parameters(descriptor);
+        //println!("{param_count}");
         if self.operands.len() < param_count {
             return Err(JVMError::InsufficientOperands {
                 required: param_count,
@@ -73,6 +74,7 @@ impl Frame {
         Ok(args)
     }
 
+    /*
     fn count_parameters(descriptor: &str) -> usize {
         let mut count = 0;
         let mut chars = descriptor.chars().skip(1);
@@ -98,6 +100,62 @@ impl Frame {
                 _ => count += 1,
             }
         }
+        count
+    }
+    */
+    fn count_parameters(descriptor: &str) -> usize {
+        let mut count = 0;
+        let mut chars = descriptor.chars();
+
+        // Skip until we find the opening '('
+        while let Some(ch) = chars.next() {
+            if ch == '(' {
+                break;
+            }
+        }
+
+        // Now process parameters until ')'
+        while let Some(ch) = chars.next() {
+            if ch == ')' {
+                break;
+            }
+
+            // Handle array types
+            if ch == '[' {
+                // Keep skipping '['
+                while let Some('[') = chars.clone().next() {
+                    chars.next();
+                }
+
+                // Peek at the next type
+                if let Some(next_ch) = chars.next() {
+                    if next_ch == 'L' {
+                        // Object inside array, skip until ';'
+                        while let Some(c) = chars.next() {
+                            if c == ';' {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                count += 1;
+            }
+            // Object type
+            else if ch == 'L' {
+                while let Some(c) = chars.next() {
+                    if c == ';' {
+                        break;
+                    }
+                }
+                count += 1;
+            }
+            // Primitive types (including 'C', 'I', 'B', etc.)
+            else {
+                count += 1;
+            }
+        }
+
         count
     }
 

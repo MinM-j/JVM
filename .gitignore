@@ -13,3 +13,5 @@ visualize/*
 *.py
 
 Latest3/*
+
+.tasks

@@ -1,0 +1,30 @@
+young: [ ("0", "java/io/ObjectStreamField"),
+  ("1", "java/lang/String$CaseInsensitiveComparator"),
+  ("2", "java/lang/Class"),
+  ("3", "java/io/ObjectStreamField"),
+  ("4", "array"),
+  ("5", "java/lang/String") ]
+old: []
+
+This is the first main string.
+
+young: [ ("6", "array"),
+  ("7", "java/lang/String") ]
+old: [ ("4", "array"),
+  ("5", "java/lang/String") ]
+young: [ ("6", "array"), 
+  ("7", "java/lang/String"), 
+  ("8", "array"), 
+  ("9", "java/lang/String") ]
+old: [ ("4", "array"), 
+  ("5", "java/lang/String") ]
+First string from createStrings()
+Second string from createStrings()
+young: [ ("10", "array"), 
+    ("11", "java/lang/String") ]
+old: [ ("4", "array"), 
+  ("5", "java/lang/String") ]
+This is the last main string.
+
+
+

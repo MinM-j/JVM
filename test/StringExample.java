@@ -4,8 +4,8 @@ public class StringExample {
         //ioTer.prints(firstMainString);
         createStrings();
         String secondMainString = "second main string."; //8
-        String lol = "third main string."; //8
-        String loloill = "last main string."; //8
+        String anotherString = "third main string."; //8
+        String lastString = "last main string."; //8
         //ioTer.prints(secondMainString);
     }
 

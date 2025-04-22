@@ -93,6 +93,7 @@ pub async fn file_writer() {
                 },
                 None => {
                     println!("Queue is empty, waiting for data...");
+                    break;
                 }
             }
         }
